@@ -1,0 +1,35 @@
+name: sync-dashboard
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 每5分钟云端拉一次最新数据
+  workflow_dispatch: {}      # 支持手动触发
+permissions:
+  contents: write
+concurrency:
+  group: sync-dashboard
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: 拉取三任务数据
+        env:
+          XLB_AUTH_B64: ${{ secrets.XLB_AUTH_B64 }}
+          TZ: Asia/Shanghai
+        run: python cloud_run.py
+      - name: 提交数据快照
+        run: |
+          git config user.name "xlb-cloud"
+          git config user.email "xlb-cloud@users.noreply.github.com"
+          git add data_task1.json data_task2.json data_task3.json
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "data: $(TZ=Asia/Shanghai date +%FT%T)"
+            git push
+          fi
