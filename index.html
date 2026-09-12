@@ -14,6 +14,8 @@
   .btn:hover { background:#4080ff; }
   .btn:disabled { background:#a9c3ff; cursor:not-allowed; }
   .btn.mini { padding:5px 12px; font-size:12px; }
+  .btn.live { background:#ff6430; font-weight:600; }
+  .btn.live:hover { background:#ff7a4d; }
   .btn.refresh-all { background:#00b578; }
   .btn.refresh-all:hover { background:#23c082; }
   .btn.ghost { background:#fff; color:#165dff; border:1px solid #bedaff; }
@@ -76,6 +78,16 @@
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
   <button class="btn mini ghost" id="btn-view" onclick="load()">↻ 刷新视图</button>
+  <a id="live-link" href="#" target="_blank" rel="noopener" style="display:none;text-decoration:none;">
+    <button class="btn live mini">⚡ 实时版（数据即时刷新）</button>
+  </a>
+  <script src="tunnel_url.js"></script>
+  <script>
+    (function(){
+      var u = window.XLB_TUNNEL_URL;
+      if (u) { var a=document.getElementById('live-link'); a.href=u; a.style.display='inline-block'; }
+    })();
+  </script>
 </header>
 <main>
   <section class="card">
