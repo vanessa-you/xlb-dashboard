@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新零帮调度看板 (GitHub)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#f0f2f5; color:#1f2329; padding-bottom:40px; }
+  header { background:#fff; border-bottom:1px solid #e5e6eb; padding:12px 24px; position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,.04); flex-wrap:wrap; }
+  header h1 { font-size:18px; }
+  #update-time { font-size:12px; color:#86909c; flex:1; min-width:180px; }
+  .btn { border:none; border-radius:6px; padding:8px 16px; font-size:13px; cursor:pointer; color:#fff; background:#165dff; transition:.15s; }
+  .btn:hover { background:#4080ff; }
+  .btn:disabled { background:#a9c3ff; cursor:not-allowed; }
+  .btn.mini { padding:5px 12px; font-size:12px; }
+  .btn.refresh-all { background:#00b578; }
+  .btn.refresh-all:hover { background:#23c082; }
+  .btn.ghost { background:#fff; color:#165dff; border:1px solid #bedaff; }
+  main { width:100%; margin:16px auto 0; padding:0 16px; }
+  .notice { margin:0 auto; max-width:100%; padding:8px 20px; font-size:12px; color:#8a6d00; background:#fffbe6; border-bottom:1px solid #f5eab0; display:none; }
+  .card { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden; }
+  .card-head { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid #f0f0f0; flex-wrap:wrap; }
+  .card-head h2 { font-size:15px; }
+  .card-head .sub { font-size:12px; color:#86909c; flex:1; }
+  .sum-row { display:flex; gap:10px; flex-wrap:wrap; padding:12px 20px; border-bottom:1px solid #f0f0f0; background:#fafbfc; }
+  .sum-item { background:#fff; border:1px solid #f0f0f0; border-radius:6px; padding:5px 12px; font-size:12px; color:#4e5969; }
+  .sum-item b { font-size:16px; margin-right:4px; }
+  .card-body { padding:10px 20px 20px; font-size:13px; }
+  .empty { color:#86909c; padding:20px 0; text-align:center; }
+  details.group { border:1px solid #f0f0f0; border-radius:8px; margin-top:10px; overflow:hidden; }
+  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:9px 14px; background:#fafbfc; font-size:13px; user-select:none; }
+  details.group summary::-webkit-details-marker { display:none; }
+  details.group summary .arrow { transition:.2s; color:#86909c; font-size:11px; }
+  details.group[open] summary .arrow { transform:rotate(90deg); }
+  details.group summary:hover { background:#f2f3f5; }
+  .driver-cell b { font-size:13px; }
+  .driver-cell span { font-size:11px; color:#86909c; margin-left:8px; }
+  .g-cnt { font-size:11px; color:#165dff; background:#e8f3ff; border-radius:10px; padding:1px 8px; }
+  table { border-collapse:collapse; width:100%; table-layout:fixed; }
+  th,td { border-top:1px solid #f2f3f5; padding:6px 14px; text-align:left; font-size:12.5px; vertical-align:top; overflow-wrap:break-word; }
+  th { color:#4e5969; font-weight:600; background:#fff; }
+  th.c,td.c { text-align:center; }
+  col.w-store { width:300px; }
+  col.w-wait { width:80px; }
+  col.w-chan { width:90px; }
+  .cnt { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 7px; border-radius:10px; background:#00b578; color:#fff; font-size:12px; font-weight:600; }
+  .cnt.zero { background:#e5e6eb; color:#86909c; font-weight:400; }
+  td.wait-hot { background:#fffbe6; }
+  .channel { font-weight:600; color:#165dff; white-space:nowrap; }
+  .pallet { display:inline-block; margin:1px 4px 1px 0; padding:2px 7px; border-radius:4px; font-size:12px; background:#f2f3f5; }
+  .pallet.s-DOING { color:#0070C0; background:#e8f1fb; }
+  .pallet.s-FINISH { color:#FF0000; background:#fdecec; }
+  .pallet.s-CHECKED { color:#d48806; background:#fff7e6; }
+  .pallet.s-LOADING { color:#00B050; background:#e8f7ef; }
+  .loaded { color:#86909c; font-size:12px; }
+  details.log { margin-top:16px; background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); padding:12px 20px; }
+  details.log summary { font-size:12px; color:#165dff; cursor:pointer; }
+  details.log pre { background:#f7f8fa; border-radius:6px; padding:10px; font-size:11px; line-height:1.5; white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:6px; color:#4e5969; }
+  .spin { display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:r .7s linear infinite; vertical-align:-2px; margin-right:5px; }
+  @keyframes r { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="notice" id="notice"></div>
+<header>
+  <h1>🚚 新零帮调度看板 <span style="font-size:11px;color:#86909c;">(GitHub 只读镜像)</span></h1>
+  <span id="update-time">加载中…</span>
+  <label style="font-size:12.5px;color:#4e5969;display:flex;align-items:center;gap:6px;">供应商
+    <select id="carrier-sel" onchange="runTask('1')" style="padding:5px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;">
+      <option value="all" selected>全部供应商</option>
+      <option value="6666600000863">当涂云顺</option>
+      <option value="6666600000749">当涂日日顺</option>
+      <option value="6666600000114">当涂逍蜂</option>
+      <option value="6666600000115">当涂原赫</option>
+    </select>
+  </label>
+  <button class="btn mini" id="btn-1" onclick="runTask('1')">更新任务1</button>
+  <button class="btn mini" id="btn-2" onclick="runTask('2')">更新任务2</button>
+  <button class="btn mini" id="btn-3" onclick="runTask('3')">更新任务3</button>
+  <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
+  <button class="btn mini ghost" id="btn-view" onclick="load()">↻ 刷新视图</button>
+</header>
+<main>
+  <section class="card">
+    <div class="card-head">
+      <h2>调度列表</h2>
+      <span class="sub" id="sub-main"></span>
+    </div>
+    <div class="sum-row" id="sum-row"></div>
+    <div class="card-body" id="body-main"><div class="empty">暂无数据，运行 sync.sh 同步后可见</div></div>
+  </section>
+
+  <details class="log" id="log-box" style="display:none;">
+    <summary>执行日志</summary>
+    <pre id="log-pre"></pre>
+  </details>
+</main>
+<script>
+const ST_CN = {'DOING':'已排计划','FINISH':'拣货完成','CHECKED':'已质检','LOADING':'装车中'};
+const API = 'http://127.0.0.1:8787';  // 更新按钮走本机看板服务（仅在本机打开时可用）
+let running = false;
+let LAST = null;
+
+function fmtTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts*1000);
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getMonth()+1}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function showLog(text){
+  const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
+  pre.textContent = text; box.style.display = 'block';
+}
+
+function find2(counts, name){
+  if(counts[name] !== undefined) return {n: counts[name], hit: name};
+  for(const k in counts){ if(k && (name.includes(k) || k.includes(name))) return {n: counts[k], hit: k}; }
+  return null;
+}
+function find3(stores, name){
+  if(stores[name]) return {e: stores[name], hit: name};
+  for(const k in stores){ if(k && (name.includes(k) || k.includes(name))) return {e: stores[k], hit: k}; }
+  return null;
+}
+
+function render(data){
+  LAST = data;
+  const t1 = data['1'], t2 = data['2'], t3 = data['3'];
+  const times = [];
+  for(const t of ['1','2','3']) if(data[t] && data[t].ts) times.push(fmtTime(data[t].ts));
+  document.getElementById('update-time').textContent =
+    times.length ? `数据时间：${times.join(' / ')}` : '暂无数据快照';
+
+  // ---- 汇总条 ----
+  let sumHtml = '';
+  if(t1) sumHtml += `<span class="sum-item"><b>${t1.total}</b>已调度${esc(t1.date)}（单${t1.carrier?' · '+esc(t1.carrier):''}）</span>`;
+  let counts = {}, stores = {};
+  if(t2) counts = t2.counts || {};
+  if(t3) stores = t3.stores || {};
+  const nonzero = Object.values(counts).filter(v=>v>0).length;
+  sumHtml += `<span class="sum-item"><b style="color:${nonzero?'#ff7d00':'#00b578'}">${Object.values(counts).reduce((a,b)=>a+b,0)}</b>待拣货（条/ ${nonzero}店）</span>`;
+  const stCnt = {'DOING':0,'FINISH':0,'CHECKED':0,'LOADING':0};
+  let palletTotal = 0;
+  for(const k in stores) for(const p of stores[k].pallets){ stCnt[p.state] = (stCnt[p.state]||0)+1; palletTotal++; }
+  sumHtml += `<span class="sum-item"><b>${Object.keys(stores).length}</b>在场门店</span>`
+    + `<span class="sum-item"><b class="st-已排计划" style="font-size:16px">${stCnt.DOING||0}</b>已排计划</span>`
+    + `<span class="sum-item"><b class="st-拣货完成" style="font-size:16px">${stCnt.FINISH||0}</b>拣货完成</span>`
+    + `<span class="sum-item"><b class="st-已质检" style="font-size:16px">${stCnt.CHECKED||0}</b>已质检</span>`
+    + `<span class="sum-item"><b class="st-装车中" style="font-size:16px">${stCnt.LOADING||0}</b>装车中</span>`;
+  document.getElementById('sum-row').innerHTML = sumHtml;
+
+  const subMain = document.getElementById('sub-main');
+  const body = document.getElementById('body-main');
+  if(!t1 && !t2 && !t3){ body.innerHTML = '<div class="empty">暂无数据，运行 sync.sh 同步后可见</div>'; return; }
+
+  // 已被任务1门店消费掉的 t2/t3 名单，剩余归入"其他门店"组
+  const used2 = new Set(), used3 = new Set();
+
+  const storeRow = (name) => {
+    const w = find2(counts, name); if(w) used2.add(w.hit);
+    const s = find3(stores, name); if(s) used3.add(s.hit);
+    let palletCell, chanCell;
+    if(s){
+      chanCell = `<span class="channel">${esc(s.e.channel)}</span>`;
+      palletCell = s.e.pallets.map(p=>`<span class="pallet s-${p.state}" title="${esc(p.channel)}">${esc(p.text)}</span>`).join('') || '<span class="loaded">-</span>';
+    } else { chanCell = '<span class="loaded">-</span>'; palletCell = '<span class="loaded">-</span>'; }
+    const n = w ? w.n : null;
+    return `<tr class="${n&&n>0?'wait-hot':''}"><td>${esc(name)}</td>`
+      + `<td class="c">${n===null?'<span class="loaded">-</span>':`<span class="cnt ${n?'':'zero'}">${n}</span>`}</td>`
+      + `<td>${chanCell}</td><td>${palletCell}</td></tr>`;
+  };
+
+  let html = '';
+  const groups = (t1 && t1.groups) || [];
+  for(const g of groups){
+    const rows = g.stores.map(storeRow).join('');
+    html += `<details class="group" open><summary>
+      <span class="arrow">▶</span>
+      <span class="driver-cell"><b>${esc(g.driver)||'(未知司机)'}</b><span>${esc(g.carrier)}</span></span>
+      <span class="g-cnt">${g.stores.length} 店</span>
+      </summary>
+      <table><colgroup><col class="w-store"><col class="w-wait"><col class="w-chan"><col></colgroup><tr><th>门店</th><th class="c">待拣/条</th><th>通道</th><th>托盘状态</th></tr>${rows}</table>
+    </details>`;
+  }
+  // 其他门店：出现在任务2/3但不在任务1列表的
+  const extra = [];
+  for(const k in stores) if(!used3.has(k)) extra.push(k);
+  for(const k in counts) if(!used2.has(k) && !extra.includes(k)) extra.push(k);
+  if(extra.length){
+    const rows = extra.map(storeRow).join('');
+    html += `<details class="group"><summary>
+      <span class="arrow">▶</span>
+      <span class="driver-cell"><b>其他门店</b><span>不在任务1列表中</span></span>
+      <span class="g-cnt">${extra.length} 店</span>
+      </summary>
+      <table><colgroup><col class="w-store"><col class="w-wait"><col class="w-chan"><col></colgroup><tr><th>门店</th><th class="c">待拣/条</th><th>通道</th><th>托盘状态</th></tr>${rows}</table>
+    </details>`;
+  }
+  body.innerHTML = html || '<div class="empty">暂无门店数据</div>';
+
+  let sub = [];
+  if(t1) sub.push(`任务1：${t1.total} 单 / ${groups.length} 条记录`);
+  sub.push(`任务2：${nonzero} 家门店有待拣`);
+  sub.push(`任务3：${palletTotal} 托`);
+  subMain.textContent = sub.join(' · ');
+}
+
+async function load(){
+  try{
+    const bust = '?t=' + Date.now();
+    const [r1, r2, r3] = await Promise.all([
+      fetch('./data_task1.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('./data_task2.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('./data_task3.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
+    ]);
+    render({'1': r1, '2': r2, '3': r3});
+    if(!r1 && !r2 && !r3) document.getElementById('update-time').textContent = '暂无数据快照（运行 sync.sh 同步）';
+  }catch(e){
+    document.getElementById('update-time').textContent = '加载失败: '+e;
+  }
+}
+
+async function runTask(tid){
+  if(running) return;
+  running = true;
+  document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
+  const sel = document.getElementById('carrier-sel');
+  if(sel) sel.disabled = true;
+  const btn = document.getElementById('btn-'+tid);
+  const old = tid==='all' ? '⟳ 全部更新' : '更新任务'+tid;
+  if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
+  try{
+    let url = API + '/api/run?task='+tid;
+    if(tid==='1' || tid==='all'){
+      const cv = sel ? sel.value : 'all';
+      url += '&carrier='+encodeURIComponent(cv);
+    }
+    const r = await fetch(url, {method:'POST'});
+    const j = await r.json();
+    render(j.data);
+    showLog((j.ok?'✅ 执行完成（本机）\n':'❌ 执行失败\n') + (j.log||'') +
+      '\n\n提示：GitHub 页面展示的是上次 sync.sh 推送的快照，如需更新网页请在本机运行 sync.sh');
+    if(btn) btn.innerHTML = old;
+  }catch(e){
+    showLog('❌ 无法连接本机看板服务 ('+e+')\n\n说明：GitHub 页面为只读镜像，\n「更新任务」按钮仅在您自己 Mac 上打开本页时可用（需本机 8787 服务已启动）；\n任意设备查看最新数据请在本机运行 sync.sh 推送快照。');
+    if(btn) btn.innerHTML = old;
+  }finally{
+    running = false;
+    document.querySelectorAll('.btn').forEach(b=>b.disabled=false);
+    const s = document.getElementById('carrier-sel');
+    if(s) s.disabled = false;
+  }
+}
+
+// 非本机打开时显示提示条
+if(!['127.0.0.1','localhost'].includes(location.hostname)){
+  const n = document.getElementById('notice');
+  n.style.display = 'block';
+  n.innerHTML = '📖 当前为 GitHub 只读镜像（数据来自最近一次 <b>sync.sh</b> 推送）。「更新任务」按钮仅在本机 Mac 打开时可用。';
+}
+
+load();
+</script>
+</body>
+</html>
