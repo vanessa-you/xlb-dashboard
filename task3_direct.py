@@ -40,7 +40,12 @@ def _bootstrap_env():
     raise RuntimeError('personal token 不可用')
 
 
-_ENV = _bootstrap_env()
+_ENV = None  # 懒加载：云端NOWRITE模式不碰腾讯文档，不触发token自举
+def _get_env():
+    global _ENV
+    if _ENV is None:
+        _ENV = _bootstrap_env()
+    return _ENV
 AUTH_FILE = os.environ.get('XLB_AUTH', '/tmp/xlb_auth.json')
 SNAP_DIR = os.environ.get('XLB_WEB_DIR', '/tmp/xlb_web')
 RESP_FILE = os.path.join(SNAP_DIR, 'center_find_direct.json')
@@ -113,7 +118,7 @@ if os.environ.get('XLB_NOWRITE') == '1' or '--nowrite' in sys.argv:
 # ---------- 工具函数 ----------
 def tdoc(tool, args):
     r = subprocess.run([PY, TD, 'tdoc_call', 'sheet-mcp', tool, json.dumps(args)],
-                       capture_output=True, text=True, env=_ENV)
+                       capture_output=True, text=True, env=_get_env())
     if r.returncode != 0:
         print('ERR', tool, r.stderr[-300:]); sys.exit(3)
     try:
