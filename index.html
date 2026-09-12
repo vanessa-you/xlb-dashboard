@@ -71,9 +71,9 @@
       <option value="6666600000863" selected>当涂云顺</option>
     </select>
   </label>
-  <button class="btn mini" id="btn-1" onclick="runTask('1')">更新任务1</button>
-  <button class="btn mini" id="btn-2" onclick="runTask('2')">更新任务2</button>
-  <button class="btn mini" id="btn-3" onclick="runTask('3')">更新任务3</button>
+  <button class="btn mini" id="btn-1" onclick="runTask('1')">任务更新</button>
+  <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
+  <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
   <button class="btn mini ghost" id="btn-view" onclick="load()">↻ 刷新视图</button>
 </header>
@@ -225,7 +225,8 @@ async function runTask(tid){
   const sel = document.getElementById('carrier-sel');
   if(sel) sel.disabled = true;
   const btn = document.getElementById('btn-'+tid);
-  const old = tid==='all' ? '⟳ 全部更新' : '更新任务'+tid;
+  const LBL = {'1':'任务更新','2':'待拣更新','3':'集货位更新'};
+  const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
     let url = API + '/api/run?task='+tid;
