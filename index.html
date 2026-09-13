@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>新零帮调度看板 (GitHub)</title>
+<title>新零帮调度看板</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#f0f2f5; color:#1f2329; padding-bottom:40px; }
@@ -14,13 +14,9 @@
   .btn:hover { background:#4080ff; }
   .btn:disabled { background:#a9c3ff; cursor:not-allowed; }
   .btn.mini { padding:5px 12px; font-size:12px; }
-  .btn.live { background:#ff6430; font-weight:600; }
-  .btn.live:hover { background:#ff7a4d; }
   .btn.refresh-all { background:#00b578; }
   .btn.refresh-all:hover { background:#23c082; }
-  .btn.ghost { background:#fff; color:#165dff; border:1px solid #bedaff; }
   main { width:100%; margin:16px auto 0; padding:0 16px; }
-  .notice { margin:0 auto; max-width:100%; padding:8px 20px; font-size:12px; color:#8a6d00; background:#fffbe6; border-bottom:1px solid #f5eab0; display:none; }
   .card { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden; }
   .card-head { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid #f0f0f0; flex-wrap:wrap; }
   .card-head h2 { font-size:15px; }
@@ -61,12 +57,49 @@
   details.log pre { background:#f7f8fa; border-radius:6px; padding:10px; font-size:11px; line-height:1.5; white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:6px; color:#4e5969; }
   .spin { display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:r .7s linear infinite; vertical-align:-2px; margin-right:5px; }
   @keyframes r { to { transform:rotate(360deg); } }
+
+  /* ---- 手机适配（<=640px） ---- */
+  @media (max-width: 640px) {
+    body { padding-bottom:24px; }
+    header { padding:10px 12px; gap:8px; }
+    header h1 { font-size:16px; width:100%; }
+    #update-time { font-size:11px; min-width:0; width:100%; order:3; }
+    header label { font-size:12px !important; margin-left:auto; }
+    header select { padding:8px 10px !important; font-size:13px !important; }
+    .btn.mini { padding:10px 12px; font-size:13px; }
+    .btn.refresh-all { padding:10px 14px; }
+    main { padding:0 8px; margin-top:10px; }
+    .card-head { padding:10px 12px; }
+    .card-head h2 { font-size:14px; }
+    .card-head .sub { font-size:11px; }
+    .sum-row { padding:8px 10px; gap:6px; }
+    .sum-item { padding:4px 8px; font-size:11px; border-radius:5px; }
+    .sum-item b { font-size:14px; }
+    .card-body { padding:6px 10px 14px; font-size:12.5px; }
+    details.group summary { padding:10px 10px; }
+    .driver-cell span { margin-left:5px; }
+    col.w-store { width:34%; }
+    col.w-wait { width:58px; }
+    col.w-chan { width:64px; }
+    th,td { padding:6px 6px; font-size:12px; }
+    th:nth-child(4), td:nth-child(4) { word-break:break-all; }
+    .pallet { padding:2px 5px; font-size:11px; margin:1px 2px 1px 0; }
+    .cnt { min-width:20px; height:19px; font-size:11px; padding:0 5px; }
+    .channel { font-size:11.5px; }
+    details.log { margin-top:12px; padding:10px 12px; }
+  }
+  /* 超窄屏（<=380px）：托盘列占比更大 */
+  @media (max-width: 380px) {
+    col.w-store { width:30%; }
+    col.w-chan { width:56px; }
+    .sum-item { padding:3px 6px; font-size:10px; }
+    .sum-item b { font-size:13px; }
+  }
 </style>
 </head>
 <body>
-<div class="notice" id="notice"></div>
 <header>
-  <h1>🚚 新零帮调度看板 <span style="font-size:11px;color:#86909c;">(云端每5分钟自动同步)</span></h1>
+  <h1>🚚 新零帮调度看板</h1>
   <span id="update-time">加载中…</span>
   <label style="font-size:12.5px;color:#4e5969;display:flex;align-items:center;gap:6px;">供应商
     <select id="carrier-sel" onchange="runTask('1')" style="padding:5px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;">
@@ -81,17 +114,6 @@
   <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
-  <button class="btn mini ghost" id="btn-view" onclick="load()">↻ 刷新视图</button>
-  <a id="live-link" href="#" target="_blank" rel="noopener" style="display:none;text-decoration:none;">
-    <button class="btn live mini">⚡ 实时版（数据即时刷新）</button>
-  </a>
-  <script src="tunnel_url.js"></script>
-  <script>
-    (function(){
-      var u = window.XLB_TUNNEL_URL;
-      if (u) { var a=document.getElementById('live-link'); a.href=u; a.style.display='inline-block'; }
-    })();
-  </script>
 </header>
 <main>
   <section class="card">
@@ -100,7 +122,7 @@
       <span class="sub" id="sub-main"></span>
     </div>
     <div class="sum-row" id="sum-row"></div>
-    <div class="card-body" id="body-main"><div class="empty">暂无数据，运行 sync.sh 同步后可见</div></div>
+    <div class="card-body" id="body-main"><div class="empty">暂无数据，点击「全部更新」获取</div></div>
   </section>
 
   <details class="log" id="log-box" style="display:none;">
@@ -110,7 +132,6 @@
 </main>
 <script>
 const ST_CN = {'DOING':'已排计划','FINISH':'拣货完成','CHECKED':'已质检','LOADING':'装车中'};
-const API = 'http://127.0.0.1:8787';  // 更新按钮走本机看板服务（仅在本机打开时可用）
 let running = false;
 let LAST = null;
 
@@ -121,10 +142,6 @@ function fmtTime(ts){
   return `${d.getMonth()+1}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function showLog(text){
-  const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
-  pre.textContent = text; box.style.display = 'block';
-}
 
 function find2(counts, name){
   if(counts[name] !== undefined) return {n: counts[name], hit: name};
@@ -143,7 +160,7 @@ function render(data){
   const times = [];
   for(const t of ['1','2','3']) if(data[t] && data[t].ts) times.push(fmtTime(data[t].ts));
   document.getElementById('update-time').textContent =
-    times.length ? `数据时间：${times.join(' / ')}` : '暂无数据快照';
+    times.length ? `最近更新：${times.join(' / ')}` : '尚未获取数据';
 
   // ---- 汇总条 ----
   let sumHtml = '';
@@ -165,7 +182,7 @@ function render(data){
 
   const subMain = document.getElementById('sub-main');
   const body = document.getElementById('body-main');
-  if(!t1 && !t2 && !t3){ body.innerHTML = '<div class="empty">暂无数据，运行 sync.sh 同步后可见</div>'; return; }
+  if(!t1 && !t2 && !t3){ body.innerHTML = '<div class="empty">暂无数据，点击「全部更新」获取</div>'; return; }
 
   // 已被任务1门店消费掉的 t2/t3 名单，剩余归入"其他门店"组
   const used2 = new Set(), used3 = new Set();
@@ -221,14 +238,9 @@ function render(data){
 
 async function load(){
   try{
-    const bust = '?t=' + Date.now();
-    const [r1, r2, r3] = await Promise.all([
-      fetch('./data_task1.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('./data_task2.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('./data_task3.json'+bust).then(r=>r.ok?r.json():null).catch(()=>null),
-    ]);
-    render({'1': r1, '2': r2, '3': r3});
-    if(!r1 && !r2 && !r3) document.getElementById('update-time').textContent = '暂无数据快照（运行 sync.sh 同步）';
+    const r = await fetch('/api/data');
+    const j = await r.json();
+    render(j.data);
   }catch(e){
     document.getElementById('update-time').textContent = '加载失败: '+e;
   }
@@ -245,7 +257,7 @@ async function runTask(tid){
   const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
-    let url = API + '/api/run?task='+tid;
+    let url = '/api/run?task='+tid;
     if(tid==='1' || tid==='all'){
       const cv = sel ? sel.value : 'all';
       url += '&carrier='+encodeURIComponent(cv);
@@ -253,11 +265,12 @@ async function runTask(tid){
     const r = await fetch(url, {method:'POST'});
     const j = await r.json();
     render(j.data);
-    showLog((j.ok?'✅ 执行完成（本机）\n':'❌ 执行失败\n') + (j.log||'') +
-      '\n\n提示：GitHub 页面展示的是上次 sync.sh 推送的快照，如需更新网页请在本机运行 sync.sh');
+    const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
+    pre.textContent = (j.ok?'✅ 执行完成\n':'❌ 执行失败\n') + (j.log||'');
+    box.style.display = 'block';
     if(btn) btn.innerHTML = old;
   }catch(e){
-    showLog('❌ 无法连接本机看板服务 ('+e+')\n\n说明：GitHub 页面为只读镜像，\n「更新任务」按钮仅在您自己 Mac 上打开本页时可用（需本机 8787 服务已启动）；\n任意设备查看最新数据请在本机运行 sync.sh 推送快照。');
+    alert('请求失败: '+e);
     if(btn) btn.innerHTML = old;
   }finally{
     running = false;
@@ -265,13 +278,6 @@ async function runTask(tid){
     const s = document.getElementById('carrier-sel');
     if(s) s.disabled = false;
   }
-}
-
-// 非本机打开时显示提示条
-if(!['127.0.0.1','localhost'].includes(location.hostname)){
-  const n = document.getElementById('notice');
-  n.style.display = 'block';
-  n.innerHTML = '📖 当前为 GitHub 只读镜像（数据来自最近一次 <b>sync.sh</b> 推送）。「更新任务」按钮仅在本机 Mac 打开时可用。';
 }
 
 load();
