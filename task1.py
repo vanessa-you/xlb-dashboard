@@ -48,11 +48,11 @@ CARRIERS = {
     '6666600000115': '当涂原赫',
 }
 CARRIER_ARG = (sys.argv[2] if len(sys.argv) > 2 else '') or os.environ.get('XLB_CARRIER', 'all')
-# 【2026-09-13 03:49 用户确认】默认只查当涂云顺(863)；如需其他供应商用 XLB_CARRIER=carrier_id 指定
-ALL_CARRIER_IDS = [6666600000863]
+# 【2026-09-14 01:25 用户确认】恢复4家供应商：all=一次查全部，下拉框可单选
+ALL_CARRIER_IDS = [6666600000863, 6666600000749, 6666600000114, 6666600000115]
 if CARRIER_ARG in ('all', ''):
     CARRIER_IDS = ALL_CARRIER_IDS
-    CARRIER_LABEL = '当涂云顺'
+    CARRIER_LABEL = '全部供应商'
 else:
     cid = int(CARRIER_ARG)
     CARRIER_IDS = [cid]
