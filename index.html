@@ -114,6 +114,7 @@
   <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
+  <button class="btn mini" id="btn-live" style="display:none;background:#ff7d00;" onclick="goLive()">⚡ 实时版</button>
 </header>
 <main>
   <section class="card">
@@ -236,17 +237,40 @@ function render(data){
   subMain.textContent = sub.join(' · ');
 }
 
+let STATIC_MODE = false;   // Pages 静态镜像：无后端接口，只读仓库快照
+let LIVE_URL = '';
+
+function goLive(){ if(LIVE_URL) location.href = LIVE_URL; }
+
+// 静态镜像模式下显示「⚡ 实时版」按钮（tunnel_url.js 只存在于 Pages）
+fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'').then(t=>{
+  const m = t && t.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+  if(m){ LIVE_URL = m[0]; document.getElementById('btn-live').style.display='inline-block'; }
+}).catch(()=>{});
+
 async function load(){
   try{
     const r = await fetch('/api/data');
-    const j = await r.json();
-    render(j.data);
+    if(r.ok){ const j = await r.json(); render(j.data); return; }
+    throw new Error('api '+r.status);
   }catch(e){
-    document.getElementById('update-time').textContent = '加载失败: '+e;
+    // 静态站回退：读同目录快照 JSON（GitHub Actions 每5分钟更新）
+    STATIC_MODE = true;
+    try{
+      const q = async f => { const r = await fetch(f+'?t='+Date.now()); return r.ok ? await r.json() : null; };
+      const [a,b,c] = await Promise.all([q('data_task1.json'), q('data_task2.json'), q('data_task3.json')]);
+      const d = {};
+      if(a) d['1']=a; if(b) d['2']=b; if(c) d['3']=c;
+      render(d);
+      if(!a&&!b&&!c) document.getElementById('update-time').textContent = '快照数据不可用';
+    }catch(e2){
+      document.getElementById('update-time').textContent = '加载失败: '+e2;
+    }
   }
 }
 
 async function runTask(tid){
+  if(STATIC_MODE){ alert('当前是静态镜像版（云端每5分钟自动更新），不能手动触发。\n要看实时数据请点橙色「⚡ 实时版」按钮。'); return; }
   if(running) return;
   running = true;
   document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
