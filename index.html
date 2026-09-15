@@ -157,8 +157,7 @@ function render(data){
   const times = [];
   for(const t of ['1','2','3']) if(data[t] && data[t].ts) times.push(fmtTime(data[t].ts));
   document.getElementById('update-time').textContent =
-    (times.length ? `最近更新：${times.join(' / ')}` : '尚未获取数据') +
-    (STATIC_MODE ? ' · 每60秒自动刷新' : '');
+    (times.length ? `最近更新：${times.join(' / ')}` : '尚未获取数据');
 
   // ---- 汇总条 ----
   let sumHtml = '';
@@ -309,8 +308,7 @@ async function runTask(tid){
 }
 
 load();
-// 自动刷新仅限 Pages 静态镜像（拉取云端新快照）；实时版（本机/隧道）不自动刷新，需手动点更新按钮
-setInterval(()=>{ if(STATIC_MODE && !running) load(); }, 60000);
+// 不做任何自动刷新（实时版/Pages均手动）：想看新数据刷新页面或点更新按钮
 </script>
 </body>
 </html>
