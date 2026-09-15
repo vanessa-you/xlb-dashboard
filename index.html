@@ -271,8 +271,10 @@ async function load(){
 }
 
 async function runTask(tid){
-  if(STATIC_MODE){ alert('当前是静态镜像版（云端每5分钟自动更新），不能手动触发。\n要看实时数据请点橙色「⚡ 实时版」按钮。'); return; }
   if(running) return;
+  // 静态镜像（Pages）：转发到实时版后端执行（需隧道开启）；未开则提示
+  const base = STATIC_MODE ? LIVE_URL : '';
+  if(STATIC_MODE && !base){ alert('实时版未开启，暂时不能手动更新。\n页面数据仍每5分钟自动更新。'); return; }
   running = true;
   document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
   const sel = document.getElementById('carrier-sel');
@@ -282,7 +284,7 @@ async function runTask(tid){
   const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
-    let url = '/api/run?task='+tid;
+    let url = base + '/api/run?task='+tid;
     if(tid==='1' || tid==='all'){
       const cv = sel ? sel.value : 'all';
       url += '&carrier='+encodeURIComponent(cv);
