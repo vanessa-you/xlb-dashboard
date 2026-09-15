@@ -157,7 +157,7 @@ function render(data){
   const times = [];
   for(const t of ['1','2','3']) if(data[t] && data[t].ts) times.push(fmtTime(data[t].ts));
   document.getElementById('update-time').textContent =
-    times.length ? `最近更新：${times.join(' / ')}` : '尚未获取数据';
+    (times.length ? `最近更新：${times.join(' / ')}` : '尚未获取数据') + ' · 每60秒自动刷新';
 
   // ---- 汇总条 ----
   let sumHtml = '';
@@ -306,6 +306,8 @@ async function runTask(tid){
 }
 
 load();
+// 自动实时刷新：每60秒重新拉取（本机走/api/data，Pages走最新快照JSON）
+setInterval(()=>{ if(!running) load(); }, 60000);
 </script>
 </body>
 </html>
