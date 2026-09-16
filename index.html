@@ -110,7 +110,6 @@
   <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
-  <button class="btn mini" id="btn-live" style="display:none;background:#ff7d00;" onclick="goLive()">⚡ 实时版</button>
 </header>
 <main>
   <section class="card">
@@ -234,20 +233,6 @@ function render(data){
 }
 
 let STATIC_MODE = false;   // Pages 静态镜像：无后端接口，只读仓库快照
-let LIVE_URL = '';
-
-function goLive(){
-  if(!LIVE_URL){ alert('实时版未就绪，请稍后刷新页面重试'); return; }
-  // 新标签页打开，避免移动端直接跳转后无法返回
-  const w = window.open(LIVE_URL, '_blank');
-  if(!w) location.href = LIVE_URL;
-}
-
-// 静态镜像模式下显示「⚡ 实时版」按钮（tunnel_url.js 只存在于 Pages）
-fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'').then(t=>{
-  const m = t && t.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-  if(m){ LIVE_URL = m[0]; document.getElementById('btn-live').style.display='inline-block'; }
-}).catch(()=>{});
 
 async function load(){
   try{
@@ -272,9 +257,11 @@ async function load(){
 
 async function runTask(tid){
   if(running) return;
-  // 静态镜像（Pages）：转发到实时版后端执行（需隧道开启）；未开则提示
-  const base = STATIC_MODE ? LIVE_URL : '';
-  if(STATIC_MODE && !base){ alert('实时版未开启，暂时不能手动更新。\n页面数据仍每5分钟自动更新。'); return; }
+  // 静态镜像（Pages）：无本机后端，不能在网页上手动触发更新
+  if(STATIC_MODE){
+    alert('网页版为只读快照。\n数据由 Mac 本机看板更新后自动同步过来（约1分钟生效）。\n需要立即拉取最新数据，请在 Mac 上打开本机看板操作。');
+    return;
+  }
   running = true;
   document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
   const sel = document.getElementById('carrier-sel');
@@ -284,7 +271,7 @@ async function runTask(tid){
   const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
-    let url = base + '/api/run?task='+tid;
+    let url = '/api/run?task='+tid;
     if(tid==='1' || tid==='all'){
       const cv = sel ? sel.value : 'all';
       url += '&carrier='+encodeURIComponent(cv);
@@ -308,7 +295,7 @@ async function runTask(tid){
 }
 
 load();
-// 不做任何自动刷新（实时版/Pages均手动）：想看新数据刷新页面或点更新按钮
+// 不做任何自动刷新：本机看板手动更新，Pages 读取同步过来的快照
 </script>
 </body>
 </html>
