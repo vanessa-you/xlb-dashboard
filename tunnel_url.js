@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://avi-developed-programme-additional.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://mesa-merely-nights-gmt.trycloudflare.com";
