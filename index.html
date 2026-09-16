@@ -232,7 +232,14 @@ function render(data){
   subMain.textContent = sub.join(' · ');
 }
 
-let STATIC_MODE = false;   // Pages 静态镜像：无后端接口，只读仓库快照
+let STATIC_MODE = false;   // Pages 静态镜像：读仓库快照展示；更新按钮经隧道转发本机执行
+let LIVE_URL = '';
+
+// 读取本机隧道入口（tunnel_url.js 只存在于 Pages 仓库）
+fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'').then(t=>{
+  const m = t && t.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+  if(m) LIVE_URL = m[0];
+}).catch(()=>{});
 
 async function load(){
   try{
@@ -257,9 +264,10 @@ async function load(){
 
 async function runTask(tid){
   if(running) return;
-  // 静态镜像（Pages）：无本机后端，不能在网页上手动触发更新
-  if(STATIC_MODE){
-    alert('网页版为只读快照。\n数据由 Mac 本机看板更新后自动同步过来（约1分钟生效）。\n需要立即拉取最新数据，请在 Mac 上打开本机看板操作。');
+  // 静态镜像（Pages）：经隧道转发到本机执行；隧道未开启则提示
+  const base = STATIC_MODE ? LIVE_URL : '';
+  if(STATIC_MODE && !base){
+    alert('隧道入口未就绪，暂时不能在网页上手动更新。\n页面仍显示最近一次同步的数据；Mac 上开启看板与隧道后即可恢复。');
     return;
   }
   running = true;
@@ -271,7 +279,7 @@ async function runTask(tid){
   const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
-    let url = '/api/run?task='+tid;
+    let url = base + '/api/run?task='+tid;
     if(tid==='1' || tid==='all'){
       const cv = sel ? sel.value : 'all';
       url += '&carrier='+encodeURIComponent(cv);
@@ -284,7 +292,9 @@ async function runTask(tid){
     box.style.display = 'block';
     if(btn) btn.innerHTML = old;
   }catch(e){
-    alert('请求失败: '+e);
+    alert(STATIC_MODE
+      ? '更新失败：本机不在线或隧道已断开。\n页面仍显示最近一次同步的数据。'
+      : '请求失败: '+e);
     if(btn) btn.innerHTML = old;
   }finally{
     running = false;
