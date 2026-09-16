@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://seafood-color-dover-resort.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://avi-developed-programme-additional.trycloudflare.com";
