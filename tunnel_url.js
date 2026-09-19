@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://clarke-lightweight-depth-adopt.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://radios-eventually-mysimon-keyboard.trycloudflare.com";
