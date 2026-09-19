@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://mesa-merely-nights-gmt.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://clarke-lightweight-depth-adopt.trycloudflare.com";
