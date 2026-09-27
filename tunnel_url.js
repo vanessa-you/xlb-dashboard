@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://radios-eventually-mysimon-keyboard.trycloudflare.com";
+window.TUNNEL_URL="https://pin-tom-tear-plaintiff.trycloudflare.com";
