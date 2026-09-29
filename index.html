@@ -46,6 +46,7 @@
   .cnt.zero { background:#e5e6eb; color:#86909c; font-weight:400; }
   td.wait-hot { background:#fffbe6; }
   .channel { font-weight:600; color:#165dff; white-space:nowrap; }
+  .chan-share { display:inline-block; margin-left:3px; padding:0 4px; border-radius:8px; font-size:10.5px; font-weight:600; color:#fff; background:#ff7d00; white-space:nowrap; }
   .pallet { display:inline-block; margin:1px 4px 1px 0; padding:2px 7px; border-radius:4px; font-size:12px; background:#f2f3f5; }
   .pallet.s-DOING { color:#0070C0; background:#e8f1fb; }
   .pallet.s-FINISH { color:#FF0000; background:#fdecec; }
@@ -169,6 +170,9 @@ function render(data){
   if(t2) counts = t2.counts || {};
   if(t3) stores = t3.stores || {};
   const nonzero = Object.values(counts).filter(v=>v>0).length;
+  // 通道共用统计：同一通道被几家门店占用（多店=多司机分属不同组，2026-09-26）
+  const chanShare = {};
+  for(const k in stores){ const ch=stores[k].channel||''; if(!ch) continue; (chanShare[ch]=chanShare[ch]||new Set()).add(k); }
   sumHtml += `<span class="sum-item"><b style="color:${nonzero?'#ff7d00':'#00b578'}">${Object.values(counts).reduce((a,b)=>a+b,0)}</b>待拣货（条/ ${nonzero}店）</span>`;
   const stCnt = {'DOING':0,'FINISH':0,'CHECKED':0,'LOADING':0};
   let palletTotal = 0;
@@ -192,7 +196,8 @@ function render(data){
     const s = find3(stores, name); if(s) used3.add(s.hit);
     let palletCell, chanCell;
     if(s){
-      chanCell = `<span class="channel">${esc(s.e.channel)}</span>`;
+      const shareN = (chanShare[s.e.channel]||new Set()).size;
+      chanCell = `<span class="channel">${esc(s.e.channel)}</span>` + (shareN>1?`<span class="chan-share" title="此通道由${shareN}家门店共用，可能分属不同司机">${shareN}店共用</span>`:'');
       palletCell = s.e.pallets.map(p=>`<span class="pallet s-${p.state}" title="${esc(p.channel)}">${esc(p.text)}</span>`).join('') || '<span class="loaded">-</span>';
     } else { chanCell = '<span class="loaded">-</span>'; palletCell = '<span class="loaded">-</span>'; }
     const n = w ? w.n : null;
@@ -266,10 +271,22 @@ async function load(){
   }
 }
 
+async function ensureTunnel(){
+  // 惰性兜底：页面加载时的隧道探测可能因网络抖动失败，点更新时再试一次
+  if(LIVE_URL) return LIVE_URL;
+  if(!STATIC_MODE) return '';
+  try{
+    const t = await fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'');
+    const m = t && t.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+    if(m) LIVE_URL = m[0];
+  }catch(e){}
+  return LIVE_URL;
+}
+
 async function runTask(tid){
   if(running) return;
   // 静态镜像（Pages）：经隧道转发到本机执行；隧道未开启则提示
-  const base = STATIC_MODE ? LIVE_URL : '';
+  const base = STATIC_MODE ? await ensureTunnel() : '';
   if(STATIC_MODE && !base){
     alert('隧道入口未就绪，暂时不能在网页上手动更新。\n页面仍显示最近一次同步的数据；Mac 上开启看板与隧道后即可恢复。');
     return;
@@ -288,7 +305,11 @@ async function runTask(tid){
       const cv = sel ? sel.value : 'all';
       url += '&carrier='+encodeURIComponent(cv);
     }
-    const r = await fetch(url, {method:'POST'});
+    // 超时保护：请求卡死时 3 分钟自动中断，避免 running 卡住导致按钮永久失效
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 180000);
+    const r = await fetch(url, {method:'POST', signal: ctrl.signal}).finally(()=>clearTimeout(timer));
+    if(!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
     render(j.data);
     const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
@@ -296,9 +317,12 @@ async function runTask(tid){
     box.style.display = 'block';
     if(btn) btn.innerHTML = old;
   }catch(e){
+    const detail = (e && e.name === 'AbortError')
+      ? '请求超过 3 分钟未响应，已中断。任务可能仍在 Mac 上后台执行，稍后刷新页面查看结果。'
+      : (e && e.message) || String(e);
     alert(STATIC_MODE
-      ? '更新失败：本机不在线或隧道已断开。\n页面仍显示最近一次同步的数据。'
-      : '请求失败: '+e);
+      ? '更新失败：'+detail+'\n（本机不在线或隧道已断开时会出现此提示；页面仍显示最近一次同步的数据）'
+      : '请求失败: '+detail);
     if(btn) btn.innerHTML = old;
   }finally{
     running = false;
