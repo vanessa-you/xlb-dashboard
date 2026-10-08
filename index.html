@@ -33,14 +33,24 @@
   details.group[open] summary .arrow { transform:rotate(90deg); }
   details.group summary:hover { background:#f2f3f5; }
   .driver-cell b { font-size:13px; }
+  .driver-cell b.loading { color:#00B050; }
   .driver-cell span { font-size:11px; color:#86909c; margin-left:8px; }
+  .carrier-edit { font-size:11px; color:#86909c; margin-left:8px; width:88px; padding:2px 6px; border:1px solid transparent; border-radius:5px; background:transparent; outline:none; }
+  .carrier-edit:hover { border-color:#e5e6eb; background:#fff; }
+  .carrier-edit:focus { border-color:#165dff; background:#fff; color:#1f2329; }
   .g-cnt { font-size:11px; color:#165dff; background:#e8f3ff; border-radius:10px; padding:1px 8px; }
+  .g-none { font-size:11px; color:#c9cdd4; }
+  /* 无托盘状态信息的分组：折起且不可展开 */
+  details.group.no-pallet summary { cursor:default; background:#fbfbfc; }
+  details.group.no-pallet summary:hover { background:#fbfbfc; }
+  details.group.no-pallet .arrow { color:#d9dde3; }
+  details.group.no-pallet summary b { color:#86909c; }
   table { border-collapse:collapse; width:100%; table-layout:fixed; }
   th,td { border-top:1px solid #f2f3f5; padding:6px 14px; text-align:left; font-size:12.5px; vertical-align:top; overflow-wrap:break-word; }
   th { color:#4e5969; font-weight:600; background:#fff; }
   th.c,td.c { text-align:center; }
   col.w-store { width:300px; }
-  col.w-wait { width:80px; }
+  col.w-wait { width:100px; }
   col.w-chan { width:90px; }
   .cnt { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 7px; border-radius:10px; background:#00b578; color:#fff; font-size:12px; font-weight:600; }
   .cnt.zero { background:#e5e6eb; color:#86909c; font-weight:400; }
@@ -53,6 +63,12 @@
   .pallet.s-CHECKED { color:#d48806; background:#fff7e6; }
   .pallet.s-LOADING { color:#00B050; background:#e8f7ef; }
   .loaded { color:#86909c; font-size:12px; }
+  .rush-btn { margin-left:10px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#ff7d00; color:#fff; cursor:pointer; vertical-align:1px; }
+  .rush-btn:hover { background:#ff9a2e; }
+  .rush-btn:disabled { background:#c9cdd4; cursor:default; }
+  .copy-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#165dff; color:#fff; cursor:pointer; vertical-align:1px; }
+  .copy-btn:hover { background:#4080ff; }
+  .copy-btn.ok { background:#00b578; }
   details.log { margin-top:16px; background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); padding:12px 20px; }
   details.log summary { font-size:12px; color:#165dff; cursor:pointer; }
   details.log pre { background:#f7f8fa; border-radius:6px; padding:10px; font-size:11px; line-height:1.5; white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:6px; color:#4e5969; }
@@ -114,7 +130,7 @@
   <button class="btn mini" id="btn-1" onclick="runTask('1')">任务更新</button>
   <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
-  <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 全部更新</button>
+  <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 待拣+集货更新</button>
 </header>
 <main>
   <section class="card">
@@ -144,6 +160,18 @@ function fmtTime(ts){
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// 劳务名称手动覆盖：按司机名记在 localStorage，改完立即保存并显示
+let CARRIER_OVR = {};
+try{ CARRIER_OVR = JSON.parse(localStorage.getItem('xlb_carrier_ovr')||'{}'); }catch(e){ CARRIER_OVR = {}; }
+function saveCarrier(input, driver){
+  const v = input.value.trim();
+  if(v) CARRIER_OVR[driver] = v; else delete CARRIER_OVR[driver];
+  try{ localStorage.setItem('xlb_carrier_ovr', JSON.stringify(CARRIER_OVR)); }catch(e){}
+}
+function carrierOf(g){
+  return CARRIER_OVR[g.driver] || g.carrier || '';
+}
+
 function find2(counts, name){
   if(counts[name] !== undefined) return {n: counts[name], hit: name};
   for(const k in counts){ if(k && (name.includes(k) || k.includes(name))) return {n: counts[k], hit: k}; }
@@ -166,8 +194,8 @@ function render(data){
   // ---- 汇总条 ----
   let sumHtml = '';
   if(t1) sumHtml += `<span class="sum-item"><b>${t1.total}</b>已调度${esc(t1.date)}（单${t1.carrier?' · '+esc(t1.carrier):''}）</span>`;
-  let counts = {}, stores = {};
-  if(t2) counts = t2.counts || {};
+  let counts = {}, stores = {}, fids0 = {};
+  if(t2){ counts = t2.counts || {}; fids0 = t2.fids0 || {}; }
   if(t3) stores = t3.stores || {};
   const nonzero = Object.values(counts).filter(v=>v>0).length;
   // 通道共用统计：同一通道被几家门店占用（多店=多司机分属不同组，2026-09-26）
@@ -201,23 +229,36 @@ function render(data){
       palletCell = s.e.pallets.map(p=>`<span class="pallet s-${p.state}" title="${esc(p.channel)}">${esc(p.text)}</span>`).join('') || '<span class="loaded">-</span>';
     } else { chanCell = '<span class="loaded">-</span>'; palletCell = '<span class="loaded">-</span>'; }
     const n = w ? w.n : null;
-    return `<tr class="${n&&n>0?'wait-hot':''}"><td>${esc(name)}</td>`
+    // 加急按钮：待拣>0 且存在 priority=0（未加急）的待拣单
+    let n0 = 0;
+    if(w && fids0[w.hit]) n0 = fids0[w.hit].length;
+    else if(w){ for(const k in fids0){ if(k && (k.includes(name) || name.includes(k))) n0 += fids0[k].length; } }
+    const rush = (n && n>0 && n0>0) ? `<button class="rush-btn" data-store="${esc(name)}" onclick="rushStore(this)" title="将该门店 ${n0} 条未加急的待拣订单加急">加急</button>` : '';
+    return `<tr class="${n&&n>0?'wait-hot':''}"><td>${esc(name)}${rush}</td>`
       + `<td class="c">${n===null?'<span class="loaded">-</span>':`<span class="cnt ${n?'':'zero'}">${n}</span>`}</td>`
       + `<td>${chanCell}</td><td>${palletCell}</td></tr>`;
   };
 
   let html = '';
   const groups = (t1 && t1.groups) || [];
-  for(const g of groups){
+  groups.forEach((g, gi) => {
+    // 名下门店全都没有托盘状态信息（任务3未收录）→ 默认折起且禁止展开
+    const hasPallet = g.stores.some(n => { const s = find3(stores, n); return s && s.e.pallets && s.e.pallets.length; });
+    // 名下门店存在「装车中」托盘 → 司机姓名显示绿色
+    const loadingN = g.stores.reduce((a,n) => { const s = find3(stores, n);
+      return a + (s && s.e.pallets ? s.e.pallets.filter(p=>p.state==='LOADING').length : 0); }, 0);
     const rows = g.stores.map(storeRow).join('');
-    html += `<details class="group" open><summary>
+    html += `<details class="group${hasPallet?'':' no-pallet'}"${hasPallet?' open':''}>
+      <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
       <span class="arrow">▶</span>
-      <span class="driver-cell"><b>${esc(g.driver)||'(未知司机)'}</b><span>${esc(g.carrier)}</span></span>
+      <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b><input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
       <span class="g-cnt">${g.stores.length} 店</span>
+      <button class="copy-btn" data-gi="${gi}" onclick="copyStores(this);event.preventDefault();event.stopPropagation();" title="复制该司机名下门店列表，用于发送给司机">复制门店</button>
+      ${hasPallet?'':'<span class="g-none" title="该司机名下门店暂无集货托盘状态，卡片已折起且不可展开">无托盘信息</span>'}
       </summary>
       <table><colgroup><col class="w-store"><col class="w-wait"><col class="w-chan"><col></colgroup><tr><th>门店</th><th class="c">待拣/条</th><th>通道</th><th>托盘状态</th></tr>${rows}</table>
     </details>`;
-  }
+  });
   // 其他门店：出现在任务2/3但不在任务1列表的
   const extra = [];
   for(const k in stores) if(!used3.has(k)) extra.push(k);
@@ -283,6 +324,67 @@ async function ensureTunnel(){
   return LIVE_URL;
 }
 
+// 门店待拣订单加急：服务端按任务2快照里的 fid 批量调 addpriority，成功后 2 秒自动刷新待拣
+async function rushStore(btn){
+  const store = btn.dataset.store;
+  if(!store || btn.disabled) return;
+  const base = STATIC_MODE ? await ensureTunnel() : '';
+  if(STATIC_MODE && !base){ alert('隧道入口未就绪，暂时无法加急。'); return; }
+  const old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '…';
+  try{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 60000);
+    const r = await fetch(base + '/api/priority?store=' + encodeURIComponent(store),
+      {method:'POST', signal: ctrl.signal}).finally(()=>clearTimeout(timer));
+    const j = await r.json();
+    if(j.ok){
+      btn.innerHTML = '已加急✓';
+      setTimeout(()=>runTask('2'), 2000);   // 2 秒后刷新待拣数据
+    }else{
+      btn.innerHTML = old; btn.disabled = false;
+      alert('加急失败：' + (j.msg || '未知错误'));
+    }
+  }catch(e){
+    const detail = (e && e.name === 'AbortError') ? '请求超时' : ((e && e.message) || String(e));
+    btn.innerHTML = old; btn.disabled = false;
+    alert('加急请求失败：' + detail);
+  }
+}
+
+// 复制司机名下门店列表：优先 clipboard API，局域网 http 环境降级 execCommand
+function copyStores(btn){
+  const gi = +btn.dataset.gi;
+  const g = LAST && LAST['1'] && LAST['1'].groups && LAST['1'].groups[gi];
+  if(!g || !g.stores || !g.stores.length){ alert('未找到该司机名下门店数据'); return; }
+  const text = g.stores.map((n,i) => `${i+1}、${n}`).join('\n');
+  const done = () => {
+    const old = btn.textContent;
+    btn.textContent = '已复制✓'; btn.classList.add('ok'); btn.disabled = true;
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('ok'); btn.disabled = false; }, 1500);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done, btn));
+  }else{
+    fallbackCopy(text, done, btn);
+  }
+}
+function fallbackCopy(text, done, btn){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{
+    if(document.execCommand('copy')){ done(); }
+    else{ throw new Error('copy 命令失败'); }
+  }catch(e){
+    alert('复制失败，请手动选择复制：\n\n' + text);
+  }finally{
+    document.body.removeChild(ta);
+  }
+}
+
 async function runTask(tid){
   if(running) return;
   // 静态镜像（Pages）：经隧道转发到本机执行；隧道未开启则提示
@@ -297,7 +399,7 @@ async function runTask(tid){
   if(sel) sel.disabled = true;
   const btn = document.getElementById('btn-'+tid);
   const LBL = {'1':'任务更新','2':'待拣更新','3':'集货位更新'};
-  const old = tid==='all' ? '⟳ 全部更新' : (LBL[tid]||('更新任务'+tid));
+  const old = tid==='all' ? '⟳ 待拣+集货更新' : (LBL[tid]||('更新任务'+tid));
   if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
   try{
     let url = base + '/api/run?task='+tid;
