@@ -357,7 +357,7 @@ function copyStores(btn){
   const gi = +btn.dataset.gi;
   const g = LAST && LAST['1'] && LAST['1'].groups && LAST['1'].groups[gi];
   if(!g || !g.stores || !g.stores.length){ alert('未找到该司机名下门店数据'); return; }
-  const text = g.stores.map((n,i) => `${i+1}、${n}`).join('\n');
+  const text = g.stores.join('\n\n');
   const done = () => {
     const old = btn.textContent;
     btn.textContent = '已复制✓'; btn.classList.add('ok'); btn.disabled = true;
