@@ -121,8 +121,8 @@
     .btn.refresh-all { padding:10px 14px; }
     main { padding:0 8px; margin-top:10px; }
     .layout { display:block; }
-    .tabs { position:sticky; top:0 !important; width:100%; min-height:0; flex-direction:row; gap:6px; padding:8px 8px; border-right:none; border-bottom:1px solid #e5e6eb; }
-    .tab { flex:1; padding:9px 8px; font-size:12.5px; text-align:center; }
+    .tabs { position:sticky; top:0; width:100%; height:auto !important; overflow:visible; flex-direction:row; gap:8px; padding:8px 10px; border-right:none; border-bottom:1px solid #e5e6eb; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+    .tab { flex:1; padding:10px 8px; font-size:13px; text-align:center; border-radius:8px; }
     .card-head { padding:10px 12px; }
     .card-head h2 { font-size:14px; }
     .card-head .sub { font-size:11px; }
@@ -493,13 +493,17 @@ function fallbackCopy(text, done){
 
 // 发车信息：查该司机当天运输中订单 → 弹窗展示可复制文本
 // ---- 页签切换与司机分类 ----
-// 左侧栏吸顶：top 与高度都跟随 header 实际高度（header 会换行变高）
+// 页签吸顶：top 与高度都跟随 header 实际高度（header 会换行变高）
+// 手机端页签为顶部横条，同样吸在 header 下方（否则会被 sticky header 盖住）
 function fitTabs(){
   const t = document.querySelector('.tabs');
-  if(t && window.innerWidth > 640){
-    const h = document.querySelector('header').offsetHeight;
-    t.style.top = h + 'px';
+  if(!t) return;
+  const h = document.querySelector('header').offsetHeight;
+  t.style.top = h + 'px';
+  if(window.innerWidth > 640){
     t.style.height = 'calc(100vh - ' + h + 'px)';
+  } else {
+    t.style.height = 'auto';
   }
 }
 window.addEventListener('resize', fitTabs);
