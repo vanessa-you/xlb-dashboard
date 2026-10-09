@@ -75,10 +75,14 @@
   .route-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#722ed1; color:#fff; cursor:pointer; vertical-align:1px; }
   .route-btn:hover { background:#8b3fe8; }
   .route-btn:disabled { background:#c9cdd4; cursor:default; }
-  /* ---- 页签 ---- */
-  .tabs { display:flex; gap:8px; padding:10px 16px 0; max-width:1400px; margin:0 auto; }
-  .tab { border:1px solid #e5e6eb; background:#fff; color:#4e5969; padding:8px 16px; border-radius:10px 10px 0 0; font-size:13.5px; cursor:pointer; border-bottom:none; }
+  /* ---- 左侧页签 ---- */
+  .layout { display:flex; align-items:stretch; }
+  .tabs { position:sticky; width:118px; flex-shrink:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:16px 10px; background:#fff; border-right:1px solid #e5e6eb; min-height:calc(100vh - 60px); z-index:5; }
+  .tab { border:1px solid #e5e6eb; background:#fff; color:#4e5969; padding:10px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; text-align:left; white-space:nowrap; }
+  .tab:hover { background:#f2f3f5; }
   .tab.active { background:#165dff; border-color:#165dff; color:#fff; font-weight:600; }
+  .tab.active:hover { background:#4080ff; }
+  .content { flex:1; min-width:0; }
   /* ---- 司机分类页 ---- */
   .drv-table { width:100%; border-collapse:collapse; }
   .drv-table th, .drv-table td { padding:9px 12px; border-bottom:1px solid #f2f3f5; text-align:left; font-size:13.5px; }
@@ -114,6 +118,9 @@
     .btn.mini { padding:10px 12px; font-size:13px; }
     .btn.refresh-all { padding:10px 14px; }
     main { padding:0 8px; margin-top:10px; }
+    .layout { display:block; }
+    .tabs { position:sticky; top:0 !important; width:100%; min-height:0; flex-direction:row; gap:6px; padding:8px 8px; border-right:none; border-bottom:1px solid #e5e6eb; }
+    .tab { flex:1; padding:9px 8px; font-size:12.5px; text-align:center; }
     .card-head { padding:10px 12px; }
     .card-head h2 { font-size:14px; }
     .card-head .sub { font-size:11px; }
@@ -167,10 +174,12 @@
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 待拣+集货更新</button>
 </header>
+<div class="layout">
 <nav class="tabs">
   <button class="tab active" id="tab-board" onclick="switchTab('board')">📋 调度看板</button>
   <button class="tab" id="tab-drivers" onclick="switchTab('drivers')">🚛 司机分类</button>
 </nav>
+<div class="content">
 <main id="page-board">
   <section class="card">
     <div class="card-head">
@@ -195,6 +204,8 @@
     <div class="card-body" id="drv-body"><div class="empty">加载中…</div></div>
   </section>
 </main>
+</div>
+</div>
 <div class="modal-bg" id="depart-modal" onclick="if(event.target===this)closeDepartModal()">
   <div class="modal">
     <h3 id="depart-title">发车信息</h3>
@@ -451,6 +462,14 @@ function fallbackCopy(text, done){
 
 // 发车信息：查该司机当天运输中订单 → 弹窗展示可复制文本
 // ---- 页签切换与司机分类 ----
+// 左侧栏吸顶位置跟随 header 实际高度（header 会换行变高）
+function fitTabs(){
+  const t = document.querySelector('.tabs');
+  if(t && window.innerWidth > 640) t.style.top = document.querySelector('header').offsetHeight + 'px';
+}
+window.addEventListener('resize', fitTabs);
+window.addEventListener('load', fitTabs);
+fitTabs();
 function switchTab(pg){
   document.getElementById('tab-board').classList.toggle('active', pg==='board');
   document.getElementById('tab-drivers').classList.toggle('active', pg==='drivers');
