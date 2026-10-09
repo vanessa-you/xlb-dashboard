@@ -118,15 +118,22 @@
     col.w-chan { width:64px; }
     th,td { padding:6px 6px; font-size:12px; }
     th:nth-child(4), td:nth-child(4) { word-break:break-all; }
+    /* 表头不竖排：表格窄屏内横向滚动，列宽保底 */
+    details table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; min-width:100%; }
+    details table th { white-space:nowrap; }
+    details table col.w-store { width:130px; min-width:130px; }
+    details table col.w-wait { width:64px; min-width:64px; }
+    details table col.w-chan { width:72px; min-width:72px; }
+    details table td:nth-child(4) { min-width:150px; }
     .pallet { padding:2px 5px; font-size:11px; margin:1px 2px 1px 0; }
     .cnt { min-width:20px; height:19px; font-size:11px; padding:0 5px; }
     .channel { font-size:11.5px; }
     details.log { margin-top:12px; padding:10px 12px; }
   }
-  /* 超窄屏（<=380px）：托盘列占比更大 */
+  /* 超窄屏（<=380px）：列宽再收紧一点，其余靠横向滚动 */
   @media (max-width: 380px) {
-    col.w-store { width:30%; }
-    col.w-chan { width:56px; }
+    details table col.w-store { width:110px; min-width:110px; }
+    details table col.w-chan { width:60px; min-width:60px; }
     .sum-item { padding:3px 6px; font-size:10px; }
     .sum-item b { font-size:13px; }
   }
