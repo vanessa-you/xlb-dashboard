@@ -76,8 +76,8 @@
   .route-btn:hover { background:#8b3fe8; }
   .route-btn:disabled { background:#c9cdd4; cursor:default; }
   /* ---- 左侧页签 ---- */
-  .layout { display:flex; align-items:stretch; }
-  .tabs { position:sticky; width:118px; flex-shrink:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:16px 10px; background:#fff; border-right:1px solid #e5e6eb; min-height:calc(100vh - 60px); z-index:5; }
+  .layout { display:flex; align-items:flex-start; }
+  .tabs { position:sticky; width:118px; flex-shrink:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:16px 10px; background:#fff; border-right:1px solid #e5e6eb; height:calc(100vh - 60px); overflow-y:auto; z-index:5; }
   .tab { border:1px solid #e5e6eb; background:#fff; color:#4e5969; padding:10px 12px; border-radius:8px; font-size:13.5px; cursor:pointer; text-align:left; white-space:nowrap; }
   .tab:hover { background:#f2f3f5; }
   .tab.active { background:#165dff; border-color:#165dff; color:#fff; font-weight:600; }
@@ -462,10 +462,14 @@ function fallbackCopy(text, done){
 
 // 发车信息：查该司机当天运输中订单 → 弹窗展示可复制文本
 // ---- 页签切换与司机分类 ----
-// 左侧栏吸顶位置跟随 header 实际高度（header 会换行变高）
+// 左侧栏吸顶：top 与高度都跟随 header 实际高度（header 会换行变高）
 function fitTabs(){
   const t = document.querySelector('.tabs');
-  if(t && window.innerWidth > 640) t.style.top = document.querySelector('header').offsetHeight + 'px';
+  if(t && window.innerWidth > 640){
+    const h = document.querySelector('header').offsetHeight;
+    t.style.top = h + 'px';
+    t.style.height = 'calc(100vh - ' + h + 'px)';
+  }
 }
 window.addEventListener('resize', fitTabs);
 window.addEventListener('load', fitTabs);
