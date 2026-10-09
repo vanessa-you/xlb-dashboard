@@ -83,6 +83,8 @@
   .tab.active { background:#165dff; border-color:#165dff; color:#fff; font-weight:600; }
   .tab.active:hover { background:#4080ff; }
   .content { flex:1; min-width:0; }
+  .pallet-toggle { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:#4e5969; cursor:pointer; user-select:none; white-space:nowrap; }
+  .pallet-toggle input { width:15px; height:15px; accent-color:#165dff; cursor:pointer; }
   /* ---- 司机分类页 ---- */
   .drv-table { width:100%; border-collapse:collapse; }
   .drv-table th, .drv-table td { padding:9px 12px; border-bottom:1px solid #f2f3f5; text-align:left; font-size:13.5px; }
@@ -185,6 +187,9 @@
     <div class="card-head">
       <h2>调度列表</h2>
       <span class="sub" id="sub-main"></span>
+      <label class="pallet-toggle" title="勾选后显示托盘车司机（司机分类页中未标记「零散」的司机）；默认只显示零散司机">
+        <input type="checkbox" id="show-pallet-chk" onchange="if(LAST)render(LAST)">显示托盘车司机
+      </label>
     </div>
     <div class="sum-row" id="sum-row"></div>
     <div class="card-body" id="body-main"><div class="empty">暂无数据，点击「全部更新」获取</div></div>
@@ -311,7 +316,15 @@ function render(data){
 
   let html = '';
   const groups = (t1 && t1.groups) || [];
+  // 司机分类过滤：默认只显示「零散」司机，托盘车司机（未标记零散）不显示；勾选「显示托盘车司机」看全部
+  const showPallet = document.getElementById('show-pallet-chk').checked;
+  const knownN = Object.keys(DRIVERS).length;
+  let shownDrv = 0;
   groups.forEach((g, gi) => {
+    const d = DRIVERS[g.driver];
+    const isScattered = d ? !!d.scattered : (knownN === 0);  // 司机名单未加载到时兜底全显示
+    if(!showPallet && !isScattered) return;
+    shownDrv++;
     // 名下门店全都没有托盘状态信息（任务3未收录）→ 默认折起且禁止展开
     const hasPallet = g.stores.some(n => { const s = find3(stores, n); return s && s.e.pallets && s.e.pallets.length; });
     // 名下门店存在「装车中」托盘 → 司机姓名显示绿色
@@ -348,7 +361,10 @@ function render(data){
   body.innerHTML = html || '<div class="empty">暂无门店数据</div>';
 
   let sub = [];
-  if(t1) sub.push(`任务1：${t1.total} 单 / ${groups.length} 条记录`);
+  if(t1){
+    const hiddenN = groups.length - shownDrv;
+    sub.push(`任务1：${t1.total} 单 / ${groups.length} 条记录` + (hiddenN>0 ? `（已隐藏 ${hiddenN} 位托盘车司机）` : ''));
+  }
   sub.push(`任务2：${nonzero} 家门店有待拣`);
   sub.push(`任务3：${palletTotal} 托`);
   subMain.textContent = sub.join(' · ');
@@ -356,6 +372,21 @@ function render(data){
 
 let STATIC_MODE = false;   // Pages 静态镜像：读仓库快照展示；更新按钮经隧道转发本机执行
 let LIVE_URL = '';
+let DRIVERS = {};          // 司机分类名单：{ 司机名: {scattered,...} }，用于调度看板过滤托盘车司机
+
+// 拉取司机分类名单（不刷新司机分类页 UI）
+async function fetchDriversMap(){
+  try{
+    const base = STATIC_MODE ? await ensureTunnel() : '';
+    if(STATIC_MODE && !base) return;
+    const r = await fetch(base + '/api/drivers');
+    const j = await r.json();
+    if(j.ok && Array.isArray(j.drivers)){
+      DRIVERS = {};
+      j.drivers.forEach(d => { DRIVERS[d.name] = d; });
+    }
+  }catch(e){ /* 拉取失败时保留旧名单，render 兜底全显示 */ }
+}
 
 // 读取本机隧道入口（tunnel_url.js 只存在于 Pages 仓库）
 fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'').then(t=>{
@@ -480,6 +511,7 @@ function switchTab(pg){
   document.getElementById('page-board').style.display = pg==='board' ? '' : 'none';
   document.getElementById('page-drivers').style.display = pg==='drivers' ? '' : 'none';
   if(pg==='drivers') loadDrivers();
+  if(pg==='board' && LAST) fetchDriversMap().then(()=>render(LAST));
 }
 async function loadDrivers(){
   const base = STATIC_MODE ? await ensureTunnel() : '';
@@ -618,6 +650,7 @@ async function runTask(tid){
     const r = await fetch(url, {method:'POST', signal: ctrl.signal}).finally(()=>clearTimeout(timer));
     if(!r.ok) throw new Error('HTTP '+r.status);
     const j = await r.json();
+    await fetchDriversMap();   // 任务更新可能新增司机，先刷新名单再渲染（托盘车过滤用）
     render(j.data);
     const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
     pre.textContent = (j.ok?'✅ 执行完成\n':'❌ 执行失败\n') + (j.log||'');
@@ -641,6 +674,8 @@ async function runTask(tid){
 }
 
 load();
+// 初始拉取司机名单后重渲染（托盘车司机过滤）
+fetchDriversMap().then(()=>{ if(LAST) render(LAST); });
 // 不做任何自动刷新：本机看板手动更新，Pages 读取同步过来的快照
 </script>
 </body>
