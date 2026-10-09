@@ -75,6 +75,19 @@
   .route-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#722ed1; color:#fff; cursor:pointer; vertical-align:1px; }
   .route-btn:hover { background:#8b3fe8; }
   .route-btn:disabled { background:#c9cdd4; cursor:default; }
+  /* ---- 页签 ---- */
+  .tabs { display:flex; gap:8px; padding:10px 16px 0; max-width:1400px; margin:0 auto; }
+  .tab { border:1px solid #e5e6eb; background:#fff; color:#4e5969; padding:8px 16px; border-radius:10px 10px 0 0; font-size:13.5px; cursor:pointer; border-bottom:none; }
+  .tab.active { background:#165dff; border-color:#165dff; color:#fff; font-weight:600; }
+  /* ---- 司机分类页 ---- */
+  .drv-table { width:100%; border-collapse:collapse; }
+  .drv-table th, .drv-table td { padding:9px 12px; border-bottom:1px solid #f2f3f5; text-align:left; font-size:13.5px; }
+  .drv-table th { color:#86909c; font-weight:500; font-size:12.5px; background:#f7f8fa; }
+  .drv-table tr:last-child td { border-bottom:none; }
+  .drv-radio { display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none; font-size:13px; }
+  .drv-radio input { width:16px; height:16px; accent-color:#ff7d00; cursor:pointer; }
+  .drv-badge { display:inline-block; margin-left:6px; padding:1px 8px; border-radius:9px; font-size:11px; background:#fff3e8; color:#ff7d00; font-weight:600; }
+  .drv-date { color:#86909c; font-size:12px; }
   .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:100; padding:14px; }
   .modal-bg.show { display:flex; }
   .modal { background:#fff; border-radius:10px; width:min(560px,100%); max-height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.2); }
@@ -154,7 +167,11 @@
   <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
   <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 待拣+集货更新</button>
 </header>
-<main>
+<nav class="tabs">
+  <button class="tab active" id="tab-board" onclick="switchTab('board')">📋 调度看板</button>
+  <button class="tab" id="tab-drivers" onclick="switchTab('drivers')">🚛 司机分类</button>
+</nav>
+<main id="page-board">
   <section class="card">
     <div class="card-head">
       <h2>调度列表</h2>
@@ -168,6 +185,15 @@
     <summary>执行日志</summary>
     <pre id="log-pre"></pre>
   </details>
+</main>
+<main id="page-drivers" style="display:none">
+  <section class="card">
+    <div class="card-head">
+      <h2>司机分类</h2>
+      <span class="sub" id="drv-sub">加载中…</span>
+    </div>
+    <div class="card-body" id="drv-body"><div class="empty">加载中…</div></div>
+  </section>
 </main>
 <div class="modal-bg" id="depart-modal" onclick="if(event.target===this)closeDepartModal()">
   <div class="modal">
@@ -424,6 +450,63 @@ function fallbackCopy(text, done){
 }
 
 // 发车信息：查该司机当天运输中订单 → 弹窗展示可复制文本
+// ---- 页签切换与司机分类 ----
+function switchTab(pg){
+  document.getElementById('tab-board').classList.toggle('active', pg==='board');
+  document.getElementById('tab-drivers').classList.toggle('active', pg==='drivers');
+  document.getElementById('page-board').style.display = pg==='board' ? '' : 'none';
+  document.getElementById('page-drivers').style.display = pg==='drivers' ? '' : 'none';
+  if(pg==='drivers') loadDrivers();
+}
+async function loadDrivers(){
+  const base = STATIC_MODE ? await ensureTunnel() : '';
+  const body = document.getElementById('drv-body');
+  if(STATIC_MODE && !base){ body.innerHTML = '<div class="empty">隧道入口未就绪，暂时无法加载。</div>'; return; }
+  try{
+    const r = await fetch(base + '/api/drivers');
+    const j = await r.json();
+    if(!j.ok) throw new Error('bad response');
+    renderDrivers(j);
+  }catch(e){
+    body.innerHTML = '<div class="empty">加载失败，请稍后重试</div>';
+  }
+}
+function renderDrivers(j){
+  const list = j.drivers || [];
+  const sc = list.filter(d=>d.scattered).length;
+  document.getElementById('drv-sub').textContent =
+    `共 ${list.length} 人 · 托盘车 ${list.length-sc} · 零散 ${sc}`;
+  const body = document.getElementById('drv-body');
+  if(!list.length){
+    body.innerHTML = '<div class="empty">暂无司机记录，点「任务更新」后自动记录</div>';
+    return;
+  }
+  const rows = list.map(d => {
+    const on = d.scattered ? ' checked' : '';
+    const badge = d.scattered
+      ? '<span class="drv-badge">零散</span>'
+      : '<span class="drv-badge" style="background:#e8f3ff;color:#165dff">托盘车</span>';
+    const last = d.last_seen===j.today ? '今天' : (d.last_seen||'');
+    return `<tr>
+      <td><span class="drv-name">${esc(d.name)}</span>
+        <label class="drv-radio" style="margin-left:10px"><input type="radio" name="drv-${esc(d.name)}"${on} data-on="${d.scattered?1:0}" onclick="toggleScatter(this,'${esc(d.name)}')">零散</label></td>
+      <td>${badge}</td>
+      <td class="drv-date">${last}</td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<table class="drv-table"><thead><tr><th>司机</th><th>标记</th><th>最后更新</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function toggleScatter(r, name){
+  const now = r.dataset.on !== '1';   // 再点一次取消
+  r.dataset.on = now ? '1' : '0';
+  r.checked = now;
+  const base = STATIC_MODE ? await ensureTunnel() : '';
+  if(STATIC_MODE && !base){ loadDrivers(); return; }
+  try{
+    await fetch(base + '/api/drivers_set?driver=' + encodeURIComponent(name) + '&scattered=' + (now?'1':'0'), {method:'POST'});
+  }catch(e){ alert('保存失败，请重试'); }
+  loadDrivers();
+}
 async function storeRoute(btn){
   const driver = btn.dataset.driver;
   if(!driver) return;
@@ -517,6 +600,7 @@ async function runTask(tid){
     pre.textContent = (j.ok?'✅ 执行完成\n':'❌ 执行失败\n') + (j.log||'');
     box.style.display = 'block';
     if(btn) btn.innerHTML = old;
+    if(document.getElementById('tab-drivers').classList.contains('active')) loadDrivers();
   }catch(e){
     const detail = (e && e.name === 'AbortError')
       ? '请求超过 3 分钟未响应，已中断。任务可能仍在 Mac 上后台执行，稍后刷新页面查看结果。'
