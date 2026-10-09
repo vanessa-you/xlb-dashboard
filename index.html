@@ -69,9 +69,6 @@
   .copy-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#165dff; color:#fff; cursor:pointer; vertical-align:1px; }
   .copy-btn:hover { background:#4080ff; }
   .copy-btn.ok { background:#00b578; }
-  .copy-btn.store { margin-left:6px; padding:0 6px; font-size:10.5px; border-radius:8px; background:#e8f3ff; color:#165dff; vertical-align:1px; }
-  .copy-btn.store:hover { background:#165dff; color:#fff; }
-  .copy-btn.store.ok { background:#00b578; color:#fff; }
   .depart-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#00b578; color:#fff; cursor:pointer; vertical-align:1px; }
   .depart-btn:hover { background:#23c082; }
   .depart-btn:disabled { background:#c9cdd4; cursor:default; }
@@ -270,8 +267,7 @@ function render(data){
     if(w && fids0[w.hit]) n0 = fids0[w.hit].length;
     else if(w){ for(const k in fids0){ if(k && (k.includes(name) || name.includes(k))) n0 += fids0[k].length; } }
     const rush = (n && n>0 && n0>0) ? `<button class="rush-btn" data-store="${esc(name)}" onclick="rushStore(this)" title="将该门店 ${n0} 条未加急的待拣订单加急">加急</button>` : '';
-    const cp = `<button class="copy-btn store" data-store="${esc(name)}" onclick="copyStoreName(this)" title="复制该门店名称">复制</button>`;
-    return `<tr class="${n&&n>0?'wait-hot':''}"><td>${esc(name)}${cp}${rush}</td>`
+    return `<tr class="${n&&n>0?'wait-hot':''}"><td>${esc(name)}${rush}</td>`
       + `<td class="c">${n===null?'<span class="loaded">-</span>':`<span class="cnt ${n?'':'zero'}">${n}</span>`}</td>`
       + `<td>${chanCell}</td><td>${palletCell}</td></tr>`;
   };
@@ -392,12 +388,6 @@ async function rushStore(btn){
 }
 
 // 复制单个门店名称（门店旁小按钮）
-function copyStoreName(btn){
-  const name = btn.dataset.store;
-  if(!name) return;
-  copyText(name, btn, '复制');
-}
-
 // 复制司机名下门店列表：优先 clipboard API，局域网 http 环境降级 execCommand
 function copyStores(btn){
   const gi = +btn.dataset.gi;
