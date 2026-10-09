@@ -75,6 +75,9 @@
   .depart-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#00b578; color:#fff; cursor:pointer; vertical-align:1px; }
   .depart-btn:hover { background:#23c082; }
   .depart-btn:disabled { background:#c9cdd4; cursor:default; }
+  .route-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#722ed1; color:#fff; cursor:pointer; vertical-align:1px; }
+  .route-btn:hover { background:#8b3fe8; }
+  .route-btn:disabled { background:#c9cdd4; cursor:default; }
   .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:100; padding:14px; }
   .modal-bg.show { display:flex; }
   .modal { background:#fff; border-radius:10px; width:min(560px,100%); max-height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.2); }
@@ -281,6 +284,7 @@ function render(data){
       <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b><input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
       <span class="g-cnt">${g.stores.length} 店</span>
       <button class="copy-btn" data-gi="${gi}" onclick="copyStores(this);event.preventDefault();event.stopPropagation();" title="复制该司机名下门店列表，用于发送给司机">复制门店</button>
+      <button class="route-btn" data-driver="${esc(g.driver)}" onclick="storeRoute(this);event.preventDefault();event.stopPropagation();" title="按从马鞍山顺丰丰泰产业园出发的货车最优路线排序该司机名下门店">门店排序</button>
       <button class="depart-btn" data-driver="${esc(g.driver)}" onclick="departInfo(this);event.preventDefault();event.stopPropagation();" title="查询该司机当天运输中订单，生成发车信息">发车信息</button>
       ${hasPallet?'':'<span class="g-none" title="该司机名下门店暂无集货托盘状态，卡片已折起且不可展开">无托盘信息</span>'}
       </summary>
@@ -423,6 +427,33 @@ function fallbackCopy(text, done){
 }
 
 // 发车信息：查该司机当天运输中订单 → 弹窗展示可复制文本
+async function storeRoute(btn){
+  const driver = btn.dataset.driver;
+  if(!driver) return;
+  const base = STATIC_MODE ? await ensureTunnel() : '';
+  if(STATIC_MODE && !base){ alert('隧道入口未就绪，暂时无法获取门店排序。'); return; }
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '计算中…';
+  try{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 90000);
+    const r = await fetch(base + '/api/store_route?driver=' + encodeURIComponent(driver),
+      {signal: ctrl.signal}).finally(()=>clearTimeout(timer));
+    const j = await r.json();
+    if(!j.ok){ alert('门店排序失败：' + (j.msg || '未知错误')); return; }
+    document.getElementById('depart-title').textContent = '门店排序 · ' + driver;
+    document.getElementById('depart-meta').textContent =
+      `在途 ${j.count} 店 · 直线全程约 ${j.total_km} 公里 · 起点：马鞍山顺丰丰泰产业园` +
+      (j.missing && j.missing.length ? ` · ⚠️${j.missing.length} 家无坐标排最后` : '');
+    document.getElementById('depart-text').value = j.text;
+    document.getElementById('depart-modal').classList.add('show');
+  }catch(e){
+    const detail = (e && e.name === 'AbortError') ? '请求超时' : ((e && e.message) || String(e));
+    alert('门店排序失败：' + detail);
+  }finally{
+    btn.disabled = false; btn.textContent = old;
+  }
+}
 async function departInfo(btn){
   const driver = btn.dataset.driver;
   if(!driver) return;
