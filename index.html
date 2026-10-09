@@ -626,7 +626,7 @@ function copyDepartText(btn){
   copyText(document.getElementById('depart-text').value, btn, '复制');
 }
 
-async function runTask(tid){
+async function runTask(tid, isRetry){
   if(running) return;
   // 静态镜像（Pages）：经隧道转发到本机执行；隧道未开启则提示
   const base = STATIC_MODE ? await ensureTunnel() : '';
@@ -662,6 +662,14 @@ async function runTask(tid){
     if(btn) btn.innerHTML = old;
     if(document.getElementById('tab-drivers').classList.contains('active')) loadDrivers();
   }catch(e){
+    // 静态镜像下失败常见原因：内存里的隧道地址已过期（隧道重启后地址会变）
+    // → 清缓存重取 tunnel_url.js，地址变了就自动重试一次；地址没变才弹提示
+    if(STATIC_MODE && !isRetry && LIVE_URL){
+      const oldUrl = LIVE_URL;
+      LIVE_URL = '';
+      const nb = await ensureTunnel();
+      if(nb && nb !== oldUrl) return runTask(tid, true);
+    }
     const detail = (e && e.name === 'AbortError')
       ? '请求超过 3 分钟未响应，已中断。任务可能仍在 Mac 上后台执行，稍后刷新页面查看结果。'
       : (e && e.message) || String(e);
