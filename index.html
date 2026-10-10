@@ -421,7 +421,8 @@ async function ensureTunnel(){
   if(!STATIC_MODE) return '';
   try{
     const t = await fetch('tunnel_url.js?t='+Date.now()).then(r=>r.ok?r.text():'');
-    const m = t && t.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+    // 只认真实快速隧道地址（形如 xxx-yyy-zzz.trycloudflare.com），排除 api./update. 等非隧道主机
+    const m = t && t.match(/https:\/\/[a-z0-9]+(?:-[a-z0-9]+){2,}\.trycloudflare\.com/);
     if(m) LIVE_URL = m[0];
   }catch(e){}
   return LIVE_URL;
