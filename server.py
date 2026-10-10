@@ -528,10 +528,8 @@ def _store_route(driver, date_str=None):
     lines = [f'门店排序 · {driver}（{month}月{day}日）',
              '起点：马鞍山顺丰丰泰产业园']
     for it in legs:
-        seg = f'（距上一站约{it["leg"]}公里）' if it['leg'] is not None else '（主档无坐标，排最后）'
+        seg = '（主档无坐标，排最后）' if it['leg'] is None else ''
         lines.append(f"{it['no']}. {it['name']}{seg}")
-    if n > 1:
-        lines.append(f'全程直线约{round(total)}公里（实际道路里程会更长）')
     return {'ok': True, 'driver': driver, 'date': date_str,
             'text': '\n'.join(lines), 'count': len(legs),
             'total_km': round(total) if n else 0,
