@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://clusters-discuss-wonder-mountain.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://ben-pharmacies-strand-accurately.trycloudflare.com";
