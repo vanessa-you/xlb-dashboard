@@ -121,11 +121,79 @@ def _sync_to_github(tids):
         print(f'[云端同步] {time.strftime("%H:%M:%S")} ok={st["ok"]} [{st["via"]}] {st["msg"]}', flush=True)
         return st
 
+AUTH_FILE = os.path.join(SCRIPTS_DIR, 'xlb_auth.json')
+LOGIN_SCRIPT = os.path.join(SCRIPTS_DIR, 'xlb_login_api.py')
+LOGIN_JSON = os.environ.get('XLB_LOGIN_JSON', os.path.expanduser('~/.xlb_login.json'))
+WMS_GATEWAY = 'https://wms-web.wms.ali-prod.xlbsoft.com'
+UA_STR = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36')
+
+
+def _auth_status():
+    """凭证健康状况（GET /api/auth）：AT 是否还有效、来源、上次保存时间、登录参数是否就绪"""
+    try:
+        auth = json.load(open(AUTH_FILE))
+    except Exception:
+        auth = {}
+    at = auth.get('access_token') or ''
+    st = {'ok': True, 'saved_at': auth.get('saved_at'), 'source': auth.get('source'),
+          'at_head': (at[:8] + '…') if at else '', 'has_at': bool(at),
+          'has_refresh': bool(auth.get('refresh_token')),
+          'has_jwt': bool(auth.get('authorization')),
+          'login_params_ready': os.path.exists(LOGIN_JSON)
+                               or bool(os.environ.get('XLB_PASSWORD')),
+          'login_script': os.path.exists(LOGIN_SCRIPT)}
+    try:
+        st['alive'] = _auth_alive()
+    except Exception as e:
+        st['alive'] = False
+        st['err'] = str(e)
+    return st
+
+
+def _auth_alive(timeout=15):
+    """探测 32 位 Access-Token 是否仍有效（真实调用业务域 WMS 接口）。
+    【2026-10-11】32位AT寿命约1天、无法用 refresh_token 续期，故靠真实调用判活。"""
+    try:
+        auth = json.load(open(AUTH_FILE))
+    except Exception:
+        return False
+    if not auth.get('access_token'):
+        return False
+    body = json.dumps({**auth.get('body', {}), 'company_id': 66666,
+                       'pick_states': ['INIT'], 'page': 1, 'size': 1}).encode()
+    req = urllib.request.Request(f'{WMS_GATEWAY}/wms/hxl.wms.pickorder.page', data=body, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('Cookie', auth.get('cookies', ''))
+    req.add_header('Access-Token', auth['access_token'])
+    try:
+        j = json.loads(urllib.request.urlopen(req, timeout=timeout).read().decode())
+    except Exception:
+        return False
+    return j.get('code') == 0
+
+
+def _api_password_login():
+    """纯 API 密码登录：机构号+账号+密码 → 新的 32 位 AT（详见 xlb_login_api.py）。
+    【2026-10-11 新增】不需要浏览器、不弹钥匙串密码、不需要人工登录，是可靠度最高的一级刷新。
+    登录参数来自 ~/.xlb_login.json（仓库外）或 XLB_ACCOUNT/XLB_COMPANY_ID/XLB_PASSWORD 环境变量。"""
+    if not os.path.exists(LOGIN_SCRIPT):
+        return None, '[跳过] 未找到 xlb_login_api.py'
+    env = _clean_env({'XLB_AUTH': AUTH_FILE})
+    r = subprocess.run([PY, LOGIN_SCRIPT], capture_output=True, text=True, timeout=120, env=env)
+    out = ((r.stdout or '') + (('\n' + r.stderr[-300:]) if (r.stderr or '').strip() else '')).strip()
+    return r.returncode, out
+
+
 def _refresh_credentials(api_only=False):
-    """认证过期时刷新凭证：①纯API刷新JWT/RT ②Chrome解密重建32位AT（主力兜底）③CDP抓包 ④sh兜底
-    注意：API续期只更新JWT，32位AT过期(1005)必须靠②/③从浏览器登录态重建，故①成功后不能直接返回。
-    【2026-09-21】api_only=True 时只跑①（30分钟主动续期用）——②会读钥匙串触发 Mac 密码弹窗，
-    只允许在任务真正报1005掉线时才触发，避免频繁要密码。"""
+    """认证过期时刷新凭证（按可靠度排序）：
+      ⓪ 纯API密码登录（机构号+账号+密码 → 新32位AT）★最可靠，无需浏览器/钥匙串
+      ① 纯API刷新JWT/RT（refresh_token轮换；AT过期时它救不了，故成功也不提前返回）
+      ② Chrome解密重建32位AT（读钥匙串，会弹 Mac 密码）
+      ③ CDP抓包兜底  ④ sh 兜底
+    【2026-09-21】api_only=True（30分钟主动续期）本意是不碰钥匙串；
+    【2026-10-11】现在 api_only 时改为：先用真实调用探活 AT —— 有效则只续 JWT；失效则走⓪密码登录。
+    这样看板在无人值守下也能自愈，不再需要人工去浏览器重新登录。"""
     api_ref = os.path.join(SCRIPTS_DIR, 'xlb_refresh_api.py')
     cap = os.path.join(SCRIPTS_DIR, 'xlb_refresh_capture.py')
     rebuild = os.path.join(SCRIPTS_DIR, 'rebuild_auth_from_chrome.py')
@@ -140,13 +208,29 @@ def _refresh_credentials(api_only=False):
         results.append(f'[{cmd[1]}] exit={r.returncode}\n{r.stdout[-200:]}{r.stderr[-200:]}')
         return r.returncode
 
+    # ⓪ 纯 API 密码登录（最高优先级：不依赖浏览器登录态，也不需要用户操作）
+    #    主动续期场景先探活，AT 还有效就不必重复登录
+    need_login = True
+    if api_only:
+        alive = _auth_alive()
+        need_login = not alive
+        results.append(f'[AT探活] {"有效" if alive else "已失效"}')
+    if need_login:
+        try:
+            rc, out = _api_password_login()
+            results.append(f'[api_password_login] exit={rc}\n{out[-400:]}')
+            if rc == 0:
+                return '[凭证刷新OK-密码登录]\n' + '\n'.join(results)
+        except Exception as e:
+            results.append(f'[api_password_login] 异常: {e}')
+
     # ① 纯API：refresh_token轮换续期JWT/RT（不解决AT过期，成功也不提前返回）
     try:
         _run([PY, api_ref])
     except Exception as e:
         results.append(f'[{api_ref}] 异常: {e}')
     if api_only:
-        return '[凭证刷新OK-仅API]\n' + '\n'.join(results)
+        return ('[凭证刷新OK-仅API]\n' if need_login else '[凭证刷新OK-AT有效仅续JWT]\n') + '\n'.join(results)
     # ② Chrome解密重建：从日常Chrome cookie/localStorage 取最新32位AT（无需CDP窗口）
     if os.path.exists(rebuild):
         try:
@@ -165,7 +249,10 @@ def _refresh_credentials(api_only=False):
     return '[凭证刷新失败]\n' + '\n'.join(results)
 
 def _proactive_refresh_loop():
-    """后台线程：每30分钟主动续期JWT（1小时时效）。仅走API不碰钥匙串（见 _refresh_credentials）"""
+    """后台线程：每30分钟检查一次凭证。
+    【2026-10-11】改为：先真实调用探活 32 位 AT —— 有效则只续 JWT；
+    失效则直接用「机构号+账号+密码」API 登录换新 AT（无需人工登录、无需浏览器）。
+    这样即使无人值守，看板也不会因登录过期而「更新失败」。"""
     interval = int(os.environ.get('XLB_REFRESH_INTERVAL', 1800))
     while True:
         time.sleep(interval)
@@ -243,17 +330,19 @@ def run_task(tid, run_kw=None):
             r = subprocess.run([PY, script], capture_output=True, text=True, timeout=180, env=env)
             out = (r.stdout or '') + (('\n[stderr] ' + r.stderr[-500:]) if r.stderr.strip() else '')
             lines.append(out.strip() or f'(exit={r.returncode})')
+            # 【2026-10-11】凭证过期自愈：32 位 AT 寿命约 1 天且 refresh_token 救不了，
+            # 检测到登录过期 → 用「机构号+账号+密码」API 登录换新 AT → 自动重跑一次。
+            # 注意与返回码解耦：有些脚本拿到 1005 仍可能 exit=0。
+            if any(k in out for k in ('1005', '登陆已过期', '登录已过期', '认证失败', '缺少Access-Token')):
+                lines.append('[检测到凭证过期] 走 API 密码登录换新 token…')
+                rf = _refresh_credentials()
+                lines.append(rf)
+                if 'OK' in rf:
+                    r = subprocess.run([PY, script], capture_output=True, text=True, timeout=180, env=env)
+                    out = (r.stdout or '') + (('\n[stderr] ' + r.stderr[-500:]) if r.stderr.strip() else '')
+                    lines.append('[重试] ' + out.strip())
             if r.returncode != 0:
                 ok = False
-                joined = out
-                if '1005' in joined or '过期' in joined or '认证' in joined or 'Access-Token' in joined:
-                    rf = _refresh_credentials()
-                    lines.append(rf)
-                    if 'OK' in rf:
-                        r2 = subprocess.run([PY, script], capture_output=True, text=True, timeout=180, env=env)
-                        out2 = (r2.stdout or '') + (('\n[stderr] ' + r2.stderr[-500:]) if r2.stderr.strip() else '')
-                        lines.append('[重试] ' + out2.strip())
-                        ok = r2.returncode == 0
         except subprocess.TimeoutExpired:
             lines.append('超时(180s)'); ok = False
         except Exception as e:
@@ -666,6 +755,9 @@ class Handler(BaseHTTPRequestHandler):
         elif p.path == '/api/data':
             body = json.dumps({'ok': True, 'data': read_data()}, ensure_ascii=False).encode()
             self._send(200, 'application/json; charset=utf-8', body)
+        elif p.path == '/api/auth':
+            body = json.dumps(_auth_status(), ensure_ascii=False).encode()
+            self._send(200, 'application/json; charset=utf-8', body)
         elif p.path == '/api/sync_status':
             try:
                 st = json.load(open(SYNC_STATUS))
@@ -688,6 +780,16 @@ class Handler(BaseHTTPRequestHandler):
             except (UnicodeEncodeError, UnicodeDecodeError):
                 pass
             res = _wms_priority(store)
+            self._send(200, 'application/json; charset=utf-8',
+                       json.dumps(res, ensure_ascii=False).encode())
+            return
+        if p.path == '/api/relogin':
+            # 手动触发「机构号+账号+密码」API 登录换新凭证（诊断/应急用）
+            try:
+                rc, out = _api_password_login()
+                res = {'ok': rc == 0, 'exit': rc, 'log': out, 'auth': _auth_status()}
+            except Exception as e:
+                res = {'ok': False, 'log': f'异常: {e}', 'auth': _auth_status()}
             self._send(200, 'application/json; charset=utf-8',
                        json.dumps(res, ensure_ascii=False).encode())
             return
