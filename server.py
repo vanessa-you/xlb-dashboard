@@ -123,6 +123,8 @@ def _sync_to_github(tids):
 
 AUTH_FILE = os.path.join(SCRIPTS_DIR, 'xlb_auth.json')
 LOGIN_SCRIPT = os.path.join(SCRIPTS_DIR, 'xlb_login_api.py')
+LOGIN_SCRIPT_FALLBACK = os.path.expanduser(
+    '~/WorkBuddy/2026-08-25-10-11-19/xlb_gh/xlb_login_api.py')  # /tmp 被清空时的备份副本
 LOGIN_JSON = os.environ.get('XLB_LOGIN_JSON', os.path.expanduser('~/.xlb_login.json'))
 WMS_GATEWAY = 'https://wms-web.wms.ali-prod.xlbsoft.com'
 UA_STR = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
@@ -177,10 +179,11 @@ def _api_password_login():
     """纯 API 密码登录：机构号+账号+密码 → 新的 32 位 AT（详见 xlb_login_api.py）。
     【2026-10-11 新增】不需要浏览器、不弹钥匙串密码、不需要人工登录，是可靠度最高的一级刷新。
     登录参数来自 ~/.xlb_login.json（仓库外）或 XLB_ACCOUNT/XLB_COMPANY_ID/XLB_PASSWORD 环境变量。"""
-    if not os.path.exists(LOGIN_SCRIPT):
-        return None, '[跳过] 未找到 xlb_login_api.py'
+    script = LOGIN_SCRIPT if os.path.exists(LOGIN_SCRIPT) else LOGIN_SCRIPT_FALLBACK
+    if not os.path.exists(script):
+        return None, '[跳过] 未找到 xlb_login_api.py（/tmp 与备份目录均无）'
     env = _clean_env({'XLB_AUTH': AUTH_FILE})
-    r = subprocess.run([PY, LOGIN_SCRIPT], capture_output=True, text=True, timeout=120, env=env)
+    r = subprocess.run([PY, script], capture_output=True, text=True, timeout=120, env=env)
     out = ((r.stdout or '') + (('\n' + r.stderr[-300:]) if (r.stderr or '').strip() else '')).strip()
     return r.returncode, out
 
