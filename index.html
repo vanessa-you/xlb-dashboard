@@ -351,7 +351,7 @@ function render(data){
       }
     }
     const loadProg = loadStores>0
-      ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店已进通道（在场待装/装车中）；待装 ${palletCnt} 拖 = 已质检+拣货完成的托盘之和（不含装车中）">🚚 装车中 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
+      ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店已进通道（在场待装/装车中）；待装 ${palletCnt} 拖 = 已质检+拣货完成的托盘之和（不含装车中）">🚚 待装车 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
     const rows = g.stores.map(storeRow).join('');
     html += `<details class="group${hasPallet?'':' no-pallet'}"${hasPallet?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
