@@ -7,7 +7,22 @@
 import json, math, os, subprocess, sys, urllib.request, urllib.error
 
 PY = '/Users/youww/.workbuddy/binaries/python/versions/3.13.12/bin/python3'
-TD = '/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/tencent-docs-plugin/1.0.0/skills/tencent-docs/tencentdocs.py'
+def _resolve_tdoc():
+    """动态定位 tencentdocs.py：腾讯文档插件升级后版本目录名会变（如 1.0.0 → 5.5.6），不能硬编码"""
+    import glob
+    cands = glob.glob('/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/'
+                      'tencent-docs-plugin/*/skills/tencent-docs/tencentdocs.py')
+    def _ver(p):
+        import re as _re
+        m = _re.search(r'tencent-docs-plugin/([0-9][0-9.]*)', p)
+        try:
+            return tuple(int(x) for x in m.group(1).strip('.').split('.'))
+        except Exception:
+            return (0,)
+    cands.sort(key=_ver)
+    return cands[-1] if cands else ''
+
+TD = os.environ.get('XLB_TDOC') or _resolve_tdoc()
 FILE_ID = 'DUXpmYVVQcmRneXFL'
 SHEET = 'BB08J2'
 
