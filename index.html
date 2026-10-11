@@ -131,8 +131,16 @@
     .sum-item { padding:4px 8px; font-size:11px; border-radius:5px; }
     .sum-item b { font-size:14px; }
     .card-body { padding:6px 10px 14px; font-size:12.5px; }
-    details.group summary { padding:10px 10px; }
-    .driver-cell span { margin-left:5px; }
+    details.group summary { padding:10px 10px; flex-wrap:wrap; row-gap:7px; }
+    /* 手机端 summary 三行：①司机姓名+劳务+店数 ②按钮 ③装车进度统计 */
+    details.group summary .arrow { width:14px; flex:none; }
+    .driver-cell { order:1; flex:1 1 auto; min-width:0; }
+    .g-cnt { order:2; flex:none; }
+    .copy-btn, .route-btn, .depart-btn { order:3; margin-left:0; flex:1 1 0; text-align:center; padding:7px 0; font-size:12px; }
+    .copy-btn { order:3; } .route-btn { order:4; } .depart-btn { order:5; }
+    .load-progress { order:6; width:100%; text-align:center; margin-left:0; padding:6px 0; font-size:12.5px; }
+    .g-none { order:7; width:100%; text-align:right; }
+    .carrier-edit { width:72px; }
     col.w-store { width:34%; }
     col.w-wait { width:58px; }
     col.w-chan { width:64px; }
