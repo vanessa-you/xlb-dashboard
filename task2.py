@@ -7,7 +7,22 @@ from collections import Counter
 NOWRITE = '--nowrite' in sys.argv or os.environ.get('XLB_NOWRITE') == '1'
 
 PY = '/Users/youww/.workbuddy/binaries/python/versions/3.13.12/bin/python3'
-TD = '/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/tencent-docs-plugin/1.0.0/skills/tencent-docs/tencentdocs.py'
+def _resolve_tdoc():
+    """动态定位 tencentdocs.py：腾讯文档插件升级后版本目录名会变（如 1.0.0 → 5.5.6），不能硬编码"""
+    import glob
+    cands = glob.glob('/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/'
+                      'tencent-docs-plugin/*/skills/tencent-docs/tencentdocs.py')
+    def _ver(p):
+        import re as _re
+        m = _re.search(r'tencent-docs-plugin/([0-9][0-9.]*)', p)
+        try:
+            return tuple(int(x) for x in m.group(1).strip('.').split('.'))
+        except Exception:
+            return (0,)
+    cands.sort(key=_ver)
+    return cands[-1] if cands else ''
+
+TD = os.environ.get('XLB_TDOC') or _resolve_tdoc()
 FILE_ID = 'DUXpmYVVQcmRneXFL'
 SHEET = 'BB08J2'
 URL = 'https://wms-web.wms.ali-prod.xlbsoft.com/wms/hxl.wms.pickorder.page'
@@ -46,19 +61,26 @@ while len(content) < total:
     content += c2
 print(f'接口OK, 待拣货单共 {total} 条(取回{len(content)})')
 
-# ---------- 2. 按门店计数 ----------
+# ---------- 2. 按门店计数（记录 fid；priority=0=未加急，控制看板加急按钮显示与加急范围） ----------
 counts = Counter()
+fids = {}
+fids0 = {}
 for it in content:
     cn = it.get('client_name')
     if cn and it.get('state') == 'INIT':
         counts[cn] += 1
+        if it.get('fid'):
+            fids.setdefault(cn, []).append(it['fid'])
+            if it.get('priority') in (0, '0', None):
+                fids0.setdefault(cn, []).append(it['fid'])
 
 # ---------- 2.5 快照输出（本地看板用，不影响写表） ----------
 import time as _t
 try:
     import os as _os2
     _os2.makedirs(SNAP_DIR, exist_ok=True)
-    json.dump({'ts': _t.time(), 'total': total, 'counts': dict(counts)},
+    json.dump({'ts': _t.time(), 'total': total, 'counts': dict(counts),
+               'fids': fids, 'fids0': fids0},
               open(os.path.join(SNAP_DIR, 'data_task2.json'), 'w'), ensure_ascii=False)
 except Exception as _e:
     print('snapshot warn:', _e)
