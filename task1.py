@@ -26,7 +26,22 @@ def _bootstrap_env():
 
 ENV = _bootstrap_env()
 PY = '/Users/youww/.workbuddy/binaries/python/versions/3.13.12/bin/python3'
-TD = '/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/tencent-docs-plugin/1.0.0/skills/tencent-docs/tencentdocs.py'
+def _resolve_tdoc():
+    """动态定位 tencentdocs.py：腾讯文档插件升级后版本目录名会变（如 1.0.0 → 5.5.6），不能硬编码"""
+    import glob
+    cands = glob.glob('/Users/youww/.workbuddy/plugins/cache/workbuddy-builtin/'
+                      'tencent-docs-plugin/*/skills/tencent-docs/tencentdocs.py')
+    def _ver(p):
+        import re as _re
+        m = _re.search(r'tencent-docs-plugin/([0-9][0-9.]*)', p)
+        try:
+            return tuple(int(x) for x in m.group(1).strip('.').split('.'))
+        except Exception:
+            return (0,)
+    cands.sort(key=_ver)
+    return cands[-1] if cands else ''
+
+TD = os.environ.get('XLB_TDOC') or _resolve_tdoc()
 FILE_ID = 'DUXpmYVVQcmRneXFL'
 SHEET = 'BB08J2'
 # 看板模式（XLB_NOWRITE=1 或 --nowrite）：只取数展示，不读写腾讯表格（2026-09-12 21:20 用户确认）
@@ -48,11 +63,11 @@ CARRIERS = {
     '6666600000115': '当涂原赫',
 }
 CARRIER_ARG = (sys.argv[2] if len(sys.argv) > 2 else '') or os.environ.get('XLB_CARRIER', 'all')
-# 【2026-09-14 03:05 用户确认】只查当涂云顺(863)；如需其他供应商用 XLB_CARRIER=carrier_id 指定
-ALL_CARRIER_IDS = [6666600000863]
+# 【2026-09-20 04:21 用户要求】默认查全部4家供应商
+ALL_CARRIER_IDS = [6666600000863, 6666600000749, 6666600000114, 6666600000115]
 if CARRIER_ARG in ('all', ''):
     CARRIER_IDS = ALL_CARRIER_IDS
-    CARRIER_LABEL = '当涂云顺'
+    CARRIER_LABEL = '全部供应商'
 else:
     cid = int(CARRIER_ARG)
     CARRIER_IDS = [cid]
