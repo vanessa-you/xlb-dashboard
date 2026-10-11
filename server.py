@@ -282,7 +282,7 @@ def _save_drivers(dd):
 
 
 def _sync_drivers():
-    """任务更新后从任务1快照同步司机名单：只增不删，保留零散标记"""
+    """任务更新后从任务1快照同步司机名单：只增不删，保留显示标记与承运商"""
     try:
         snap = json.load(open(SNAP['1']))
     except Exception:
@@ -295,12 +295,18 @@ def _sync_drivers():
         if not name:
             continue
         it = dd.get(name)
+        carrier = (g.get('carrier') or '').strip()
         if it is None:
-            dd[name] = {'scattered': True, 'first_seen': today, 'last_seen': today}  # 默认按零散司机记录
+            dd[name] = {'scattered': True, 'first_seen': today, 'last_seen': today,
+                        'carrier': carrier}  # 默认显示；记录当天承运商
             changed = True
-        elif it.get('last_seen') != today:
-            it['last_seen'] = today
-            changed = True
+        else:
+            if it.get('last_seen') != today:
+                it['last_seen'] = today
+                changed = True
+            if carrier and it.get('carrier') != carrier:   # 承运商取最近一次出现值
+                it['carrier'] = carrier
+                changed = True
     if changed:
         _save_drivers(dd)
 
