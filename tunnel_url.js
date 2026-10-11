@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://lenses-purposes-routes-desert.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://employees-ladies-significant-helping.trycloudflare.com";
