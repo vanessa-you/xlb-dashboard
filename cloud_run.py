@@ -121,7 +121,9 @@ def write_auth(res):
         'authorization': (f'{res["token_type"]} {res["jwt"]}' if res['jwt'] else 'Bearer'),
         'refresh_token': res['refresh_token'],
         'cookies': '; '.join(f'{k}={v}' for k, v in ck.items()),
-        'url': GDP, 'body': '',
+        # url/task3、body/task2 依赖的字段（与浏览器抓包的 /tmp/xlb_auth.json 结构一致）
+        'url': WMS_DISTRIBUTE_URL,
+        'body': dict(BODY_BASE),
         'saved_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'source': 'cloud_password_login',
     }
@@ -129,9 +131,25 @@ def write_auth(res):
     _log(f'D. 凭证已写入 {AUTH}')
 
 
+WMS_DISTRIBUTE_URL = 'https://wms-web.wms.ali-prod.xlbsoft.com/wms/hxl.wms.distribute.center.find'
+BODY_BASE = {'operator_store_id': 6666600000001, 'company_id': 66666, 'client_ids': [],
+             'storehouse_id': 6666600000134, 'store_id': 6666600000001, 'region_ids': []}
+
+
+def _normalize_auth(d):
+    """修复旧版本 write_auth 写入的 body/url 结构（task2 依赖 dict body，task3 依赖 wms-web url）"""
+    fixed = False
+    if not isinstance(d.get('body'), dict) or not d['body']:
+        d['body'] = dict(BODY_BASE); fixed = True
+    if 'wms-web' not in str(d.get('url') or ''):
+        d['url'] = WMS_DISTRIBUTE_URL; fixed = True
+    if fixed:
+        json.dump(d, open(AUTH, 'w'), ensure_ascii=False, indent=1)
+        _log('已规范化 auth.json 的 body/url 结构')
+
+
 def ensure_credentials():
-    """确保 auth.json 存在且 AT 有效；必要时密码登录重建"""
-    # 1) secret 注入的静态凭证（兼容旧配置）
+    """确保 auth.json 存在且 AT 有效；必要时密码登录重建"""    # 1) secret 注入的静态凭证（兼容旧配置）
     b64 = os.environ.get('XLB_AUTH_B64', '')
     if b64:
         try:
@@ -142,11 +160,13 @@ def ensure_credentials():
     # 2) 已有凭证探活
     if os.path.exists(AUTH):
         try:
-            at = json.load(open(AUTH)).get('access_token')
+            d = json.load(open(AUTH))
+            at = d.get('access_token')
             if at:
                 ok, info = probe_at(at)
                 if ok:
                     _log(f'已有凭证有效（AT尾号…{at[-6:]}），跳过登录')
+                    _normalize_auth(d)   # 修复旧版本写入的 body/url 结构
                     return True
                 _log(f'已有凭证失效（{info}），尝试重新获取')
         except Exception as e:
