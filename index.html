@@ -187,8 +187,8 @@
     <div class="card-head">
       <h2>调度列表</h2>
       <span class="sub" id="sub-main"></span>
-      <label class="pallet-toggle" title="勾选后显示托盘车司机（司机分类页中未标记「零散」的司机）；默认只显示零散司机">
-        <input type="checkbox" id="show-pallet-chk" onchange="if(LAST)render(LAST)">显示托盘车司机
+      <label class="pallet-toggle" title="勾选后显示全部司机（含司机分类页中标记「不显示」的）；默认只显示标记「显示」的司机">
+        <input type="checkbox" id="show-pallet-chk" onchange="if(LAST)render(LAST)">显示隐藏司机
       </label>
     </div>
     <div class="sum-row" id="sum-row"></div>
@@ -316,7 +316,7 @@ function render(data){
 
   let html = '';
   const groups = (t1 && t1.groups) || [];
-  // 司机分类过滤：默认只显示「零散」司机，托盘车司机（未标记零散）不显示；勾选「显示托盘车司机」看全部
+  // 司机分类过滤：默认只显示标记「显示」的司机，标记「不显示」的隐藏；勾选「显示隐藏司机」看全部
   const showPallet = document.getElementById('show-pallet-chk').checked;
   const knownN = Object.keys(DRIVERS).length;
   let shownDrv = 0;
@@ -363,7 +363,7 @@ function render(data){
   let sub = [];
   if(t1){
     const hiddenN = groups.length - shownDrv;
-    sub.push(`任务1：${t1.total} 单 / ${groups.length} 条记录` + (hiddenN>0 ? `（已隐藏 ${hiddenN} 位托盘车司机）` : ''));
+    sub.push(`任务1：${t1.total} 单 / ${groups.length} 条记录` + (hiddenN>0 ? `（已隐藏 ${hiddenN} 位司机）` : ''));
   }
   sub.push(`任务2：${nonzero} 家门店有待拣`);
   sub.push(`任务3：${palletTotal} 托`);
@@ -372,7 +372,7 @@ function render(data){
 
 let STATIC_MODE = false;   // Pages 静态镜像：读仓库快照展示；更新按钮经隧道转发本机执行
 let LIVE_URL = '';
-let DRIVERS = {};          // 司机分类名单：{ 司机名: {scattered,...} }，用于调度看板过滤托盘车司机
+let DRIVERS = {};          // 司机分类名单：{ 司机名: {scattered(=显示), carrier,...} }，用于调度看板过滤不显示的司机
 
 // 拉取司机分类名单（不刷新司机分类页 UI）
 async function fetchDriversMap(){
@@ -532,40 +532,45 @@ async function loadDrivers(){
   }
 }
 function renderDrivers(j){
-  const list = j.drivers || [];
+  // 只显示当天有配送任务的司机（last_seen=今天，随任务1更新自动刷新）
+  const todayN = (j.drivers || []).filter(d => d.last_seen === j.today);
+  const list = todayN;
   const sc = list.filter(d=>d.scattered).length;
   document.getElementById('drv-sub').textContent =
-    `共 ${list.length} 人 · 托盘车 ${list.length-sc} · 零散 ${sc}`;
+    `今天 ${list.length} 人 · 显示 ${sc} · 不显示 ${list.length-sc}` +
+    (j.drivers && j.drivers.length > list.length ? ` ·（历史司机 ${j.drivers.length-list.length} 人未显示）` : '');
   const body = document.getElementById('drv-body');
   if(!list.length){
-    body.innerHTML = '<div class="empty">暂无司机记录，点「任务更新」后自动记录</div>';
+    body.innerHTML = '<div class="empty">今天暂无配送司机，点「任务更新」后自动记录</div>';
     return;
   }
   const rows = list.map(d => {
-    const on = d.scattered ? ' checked' : '';
-    const badge = d.scattered
-      ? '<span class="drv-badge">零散</span>'
-      : '<span class="drv-badge" style="background:#e8f3ff;color:#165dff">托盘车</span>';
-    const last = d.last_seen===j.today ? '今天' : (d.last_seen||'');
+    const show = !!d.scattered;
+    const badge = show
+      ? '<span class="drv-badge">显示中</span>'
+      : '<span class="drv-badge" style="background:#e8f3ff;color:#165dff">已隐藏</span>';
+    const carrier = esc(d.carrier || '-');
     return `<tr>
-      <td><span class="drv-name">${esc(d.name)}</span>
-        <label class="drv-radio" style="margin-left:10px"><input type="radio" name="drv-${esc(d.name)}"${on} data-on="${d.scattered?1:0}" onclick="toggleScatter(this,'${esc(d.name)}')">零散</label></td>
+      <td><span class="drv-name">${esc(d.name)}</span></td>
+      <td>${carrier}</td>
+      <td>
+        <label class="drv-radio"><input type="radio" name="drv-${esc(d.name)}" data-on="1"${show?' checked':''} onclick="toggleShow('${esc(d.name)}',1)">显示</label>
+        <label class="drv-radio"><input type="radio" name="drv-${esc(d.name)}" data-on="0"${show?'':' checked'} onclick="toggleShow('${esc(d.name)}',0)">不显示</label>
+      </td>
       <td>${badge}</td>
-      <td class="drv-date">${last}</td>
     </tr>`;
   }).join('');
-  body.innerHTML = `<table class="drv-table"><thead><tr><th>司机</th><th>标记</th><th>最后更新</th></tr></thead><tbody>${rows}</tbody></table>`;
+  body.innerHTML = `<table class="drv-table"><thead><tr><th>司机</th><th>承运商</th><th>调度看板显示</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-async function toggleScatter(r, name){
-  const now = r.dataset.on !== '1';   // 再点一次取消
-  r.dataset.on = now ? '1' : '0';
-  r.checked = now;
+async function toggleShow(name, show){
   const base = STATIC_MODE ? await ensureTunnel() : '';
   if(STATIC_MODE && !base){ loadDrivers(); return; }
   try{
-    await fetch(base + '/api/drivers_set?driver=' + encodeURIComponent(name) + '&scattered=' + (now?'1':'0'), {method:'POST'});
+    await fetch(base + '/api/drivers_set?driver=' + encodeURIComponent(name) + '&scattered=' + (show?'1':'0'), {method:'POST'});
   }catch(e){ alert('保存失败，请重试'); }
   loadDrivers();
+  // 显示状态影响调度看板过滤，切回看板时重新渲染
+  if(LAST) fetchDriversMap().then(()=>render(LAST));
 }
 async function storeRoute(btn){
   const driver = btn.dataset.driver;
