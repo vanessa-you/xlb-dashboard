@@ -325,6 +325,9 @@ function render(data){
 
   let html = '';
   const groups = (t1 && t1.groups) || [];
+  // 更新后保持卡片展开/关闭状态：重建前记录现有卡片开关（按司机名；其他门店用固定键）
+  const prevOpen = {};
+  document.querySelectorAll('#body-main details.group[data-gkey]').forEach(d => { prevOpen[d.dataset.gkey] = d.open; });
   // 司机分类过滤：默认只显示标记「显示」的司机，标记「不显示」的隐藏；勾选「显示隐藏司机」看全部
   const showPallet = document.getElementById('show-pallet-chk').checked;
   const knownN = Object.keys(DRIVERS).length;
@@ -353,7 +356,10 @@ function render(data){
     const loadProg = loadStores>0
       ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店已进通道（在场待装/装车中）；待装 ${palletCnt} 拖 = 已质检+拣货完成的托盘之和（不含装车中）">🚚 待装车 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
     const rows = g.stores.map(storeRow).join('');
-    html += `<details class="group${hasPallet?'':' no-pallet'}"${hasPallet?' open':''}>
+    // 展开状态：用户点过则保持原状态；首次渲染默认有托盘信息的展开
+    const gkey = esc(g.driver) || '(未知司机)';
+    const open = (gkey in prevOpen) ? prevOpen[gkey] : hasPallet;
+    html += `<details class="group${hasPallet?'':' no-pallet'}" data-gkey="${gkey}"${open?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
       <span class="arrow">▶</span>
       <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b><input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
@@ -373,7 +379,8 @@ function render(data){
   for(const k in counts) if(!used2.has(k) && !extra.includes(k)) extra.push(k);
   if(extra.length){
     const rows = extra.map(storeRow).join('');
-    html += `<details class="group"><summary>
+    const extraOpen = ('__extra__' in prevOpen) ? prevOpen['__extra__'] : false;
+    html += `<details class="group" data-gkey="__extra__"${extraOpen?' open':''}><summary>
       <span class="arrow">▶</span>
       <span class="driver-cell"><b>其他门店</b><span>不在任务1列表中</span></span>
       <span class="g-cnt">${extra.length} 店</span>
