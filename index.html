@@ -331,20 +331,18 @@ function render(data){
     // 名下门店存在「装车中」托盘 → 司机姓名显示绿色
     const loadingN = g.stores.reduce((a,n) => { const s = find3(stores, n);
       return a + (s && s.e.pallets ? s.e.pallets.filter(p=>p.state==='LOADING').length : 0); }, 0);
-    // 装车进度：装车中门店数 + 该司机名下所有带托盘号（DC-xxxx）的托盘总数
+    // 装车进度：装车中门店数（名下存在通道号/在场托盘信息的门店都算）+ 所有带托盘号（DC-xxxx）的托盘总数
     let loadStores = 0, palletCnt = 0;
     for(const n of g.stores){
       const s = find3(stores, n);
-      if(!s || !s.e.pallets) continue;
-      let hasLoad = false;
-      for(const p of s.e.pallets){
+      if(!s) continue;
+      if(s.e.channel || (s.e.pallets && s.e.pallets.length)) loadStores++;
+      for(const p of (s.e.pallets||[])){
         if(/^DC-/.test(p.text||'') || /^DC-/.test(p.channel||'')) palletCnt++;
-        if(p.state==='LOADING') hasLoad = true;
       }
-      if(hasLoad) loadStores++;
     }
     const loadProg = loadStores>0
-      ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店正在装车；名下共 ${palletCnt} 拖带托盘号（DC-xxxx），尚未全部装完">🚚 装车中 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
+      ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店已进通道（在场待装/装车中）；名下共 ${palletCnt} 拖带托盘号（DC-xxxx）">🚚 装车中 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
     const rows = g.stores.map(storeRow).join('');
     html += `<details class="group${hasPallet?'':' no-pallet'}"${hasPallet?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
