@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://differential-recognition-guru-friend.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://hay-creative-putting-assumes.trycloudflare.com";
