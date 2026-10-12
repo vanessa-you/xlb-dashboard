@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://headquarters-max-freelance-translations.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://differential-recognition-guru-friend.trycloudflare.com";
