@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://canberra-anime-companies-mambo.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://cat-corrected-mazda-onto.trycloudflare.com";
