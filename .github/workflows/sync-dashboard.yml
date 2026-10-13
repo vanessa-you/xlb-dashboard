@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: sync-dashboard
+  group: sync-dashboard      # 同组串行排队，避免两个 run 同时登录（防风控/超时）
   cancel-in-progress: false
 jobs:
   fetch:
@@ -17,10 +17,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      # 关键修复（2026-10-13）：凭证跨 run 复用。
+      # 之前每个 run 都拿静态 secret 里的过期 AT 探活 → 每次都现场密码登录，
+      # 而登录接口从海外 runner 访问国内偶发超时 → run 失败率高。
+      # 现在把 auth.json 缓存起来，AT 有效期约 1 天，绝大多数 run 直接命中、跳过登录。
+      - name: 恢复凭证缓存
+        id: auth_cache
+        uses: actions/cache@v4
+        with:
+          path: auth.json
+          key: xlb-auth-${{ github.run_id }}
+          restore-keys: |
+            xlb-auth-
       - name: 拉取三任务数据
         env:
           XLB_AUTH_B64: ${{ secrets.XLB_AUTH_B64 }}
-          # 密码登录自愈：静态凭证失效时自动用账号密码重新登录拿新 AT
+          # 密码登录自愈：仅在缓存凭证失效时才登录（带 3 次重试）
           XLB_ACCOUNT: ${{ secrets.XLB_ACCOUNT }}
           XLB_COMPANY_ID: ${{ secrets.XLB_COMPANY_ID }}
           XLB_PASSWORD: ${{ secrets.XLB_PASSWORD }}
