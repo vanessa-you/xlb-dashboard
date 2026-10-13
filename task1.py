@@ -129,10 +129,19 @@ else:
 # 【2026-09-12 20:28 用户确认】调度管理列表中相邻数据同司机=一条记录；司机中间隔开再出现=新的一条(多趟)
 seq = []  # [(carrier, driver, [stores])] 保序
 cur_key, cur_sts = None, []
+meta = {}  # 【2026-10-14 用户要求】(劳务,司机) -> 车牌/手机号（组内取首次非空值），看板显示+点击拨号
 for o in rows:
     dn = (o.get('driver_name') or '').strip()
     lb = (o.get('carrier_name') or '').strip()  # 劳务=承运商名
     st = (o.get('client_name') or '').strip()
+    k = (lb, dn)
+    m = meta.setdefault(k, {})
+    _pl = (o.get('plate_number') or '').strip()
+    _ph = (o.get('driver_phone') or '').strip()
+    if _pl and not m.get('plate'):
+        m['plate'] = _pl
+    if _ph and not m.get('phone'):
+        m['phone'] = _ph
     if (lb, dn) != cur_key:
         if cur_key is not None and cur_sts:
             seq.append((cur_key[0], cur_key[1], list(dict.fromkeys(cur_sts))))  # 【2026-09-13 05:16】组内门店去重（同店多次加单只留一行）
@@ -201,7 +210,9 @@ try:
     os.makedirs(SNAP_DIR, exist_ok=True)
     json.dump({'ts': _t.time(), 'date': QDATE, 'total': len(rows),
                'carrier': CARRIER_LABEL,
-               'groups': [{'carrier': lb, 'driver': dn, 'stores': sts}
+               'groups': [{'carrier': lb, 'driver': dn, 'stores': sts,
+                           'plate': (meta.get((lb, dn)) or {}).get('plate', ''),
+                           'phone': (meta.get((lb, dn)) or {}).get('phone', '')}
                           for lb, dn, sts in seq],
                'new_count': sum(len(v) for *_, v in new_seq)},
               open(os.path.join(SNAP_DIR, 'data_task1.json'), 'w'), ensure_ascii=False)
