@@ -59,10 +59,28 @@ def probe_at(at):
     return j.get('code') == 0, f'code={j.get("code")} msg={j.get("msg")}'
 
 
+def probe_at_retry(at, attempts=3, delay=4):
+    """探活带重试：网络抖动（code=-1/超时）不算凭证过期，避免误触发登录；
+    只有明确 1005/登陆已过期才立即判定失效"""
+    info = ''
+    for i in range(attempts):
+        ok, info = probe_at(at)
+        if ok:
+            return True, info
+        if '1005' in info or '登陆' in info or '登录' in info:
+            return False, info
+        if i < attempts - 1:
+            _log(f'探活异常（{info}），{delay}s 后重试')
+            time.sleep(delay)
+    return False, info
+
+
 def password_login(acc, company_id, pwd):
-    """纯 API 密码登录，返回 dict(access_token, jwt, refresh_token, token_type, user)"""
+    """纯 API 密码登录，返回 dict(access_token, jwt, refresh_token, token_type, user)
+    2026-10-13：登录接口从海外 runner 访问国内服务偶发超时（urlopen timed out），
+    故单次调用超时放宽到 45s；上层再做整体重试"""
     ja = _post('/erp-mdm/hxl.erp.account.pwd.user.find',
-               {'account': acc, 'company_id': company_id, 'pwd': pwd})
+               {'account': acc, 'company_id': company_id, 'pwd': pwd}, timeout=45)
     if ja.get('code') != 0:
         raise RuntimeError(f'密码校验失败: code={ja.get("code")} msg={ja.get("msg")}')
     d = ja.get('data') or {}
@@ -76,7 +94,7 @@ def password_login(acc, company_id, pwd):
     jb = _post('/erp-mdm/hxl.erp.user.account.login',
                {'account': acc, 'company_id': company_id, 'source': 'WEB',
                 'user_id': uid, 'login_source': 'WEB'},
-               {'Access-token': lt})
+               {'Access-token': lt}, timeout=45)
     if jb.get('code') != 0:
         raise RuntimeError(f'换取凭据失败: code={jb.get("code")} msg={jb.get("msg")}')
     ud = jb.get('data') or {}
@@ -148,22 +166,41 @@ def _normalize_auth(d):
         _log('已规范化 auth.json 的 body/url 结构')
 
 
+def login_with_retry(acc, comp, pwd, attempts=3, delay=8):
+    """密码登录带重试：云端到国内接口偶发超时，重试可显著降低 run 失败率"""
+    last = None
+    for i in range(attempts):
+        try:
+            res = password_login(acc, comp, pwd)
+            if i:
+                _log(f'（第 {i + 1} 次尝试成功）')
+            return res
+        except Exception as e:
+            last = e
+            _log(f'密码登录第 {i + 1}/{attempts} 次失败: {e}')
+            if i < attempts - 1:
+                time.sleep(delay * (i + 1))     # 8s / 16s 退避
+    raise RuntimeError(f'密码登录重试 {attempts} 次仍失败: {last}')
+
+
 def ensure_credentials():
-    """确保 auth.json 存在且 AT 有效；必要时密码登录重建"""    # 1) secret 注入的静态凭证（兼容旧配置）
+    """确保 auth.json 存在且 AT 有效；必要时密码登录重建
+    2026-10-13：auth.json 由 workflow 的 actions/cache 跨 run 复用（关键！），
+    因此正常情况大部分 run 直接命中缓存凭证、跳过登录；只有缓存过期才登录"""
     b64 = os.environ.get('XLB_AUTH_B64', '')
-    if b64:
+    if b64 and not os.path.exists(AUTH):
         try:
             open(AUTH, 'wb').write(base64.b64decode(b64))
         except Exception as e:
             _log(f'XLB_AUTH_B64 解码失败: {e}')
 
-    # 2) 已有凭证探活
+    # 2) 已有凭证探活（优先缓存里的 auth.json）
     if os.path.exists(AUTH):
         try:
             d = json.load(open(AUTH))
             at = d.get('access_token')
             if at:
-                ok, info = probe_at(at)
+                ok, info = probe_at_retry(at)
                 if ok:
                     _log(f'已有凭证有效（AT尾号…{at[-6:]}），跳过登录')
                     _normalize_auth(d)   # 修复旧版本写入的 body/url 结构
@@ -172,7 +209,7 @@ def ensure_credentials():
         except Exception as e:
             _log(f'读取凭证失败: {e}')
 
-    # 3) 密码登录
+    # 3) 密码登录（带重试）
     acc = os.environ.get('XLB_ACCOUNT')
     comp = os.environ.get('XLB_COMPANY_ID')
     pwd = os.environ.get('XLB_PASSWORD')
@@ -180,7 +217,7 @@ def ensure_credentials():
         _log('错误: 凭证失效且缺少 XLB_ACCOUNT/XLB_COMPANY_ID/XLB_PASSWORD secrets')
         return False
     try:
-        res = password_login(acc.strip(), int(comp), pwd)
+        res = login_with_retry(acc.strip(), int(comp), pwd)
     except Exception as e:
         _log(f'密码登录失败: {e}')
         return False
