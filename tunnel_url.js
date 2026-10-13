@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://frequent-movie-think-hepatitis.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://processes-genres-kenneth-medieval.trycloudflare.com";
