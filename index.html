@@ -338,7 +338,23 @@ function render(data){
   };
 
   let html = '';
-  const groups = (t1 && t1.groups) || [];
+  let groups = (t1 && t1.groups) || [];
+  let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（copyStores 按 data-gi 取原始组）
+  // 【2026-10-14 用户要求】列表跟随供应商下拉框：下拉框选了某劳务（默认当涂云顺）时，
+  // 即使快照是「全部供应商」拉下来的，页面也只显示该劳务的司机任务
+  {
+    const sel = document.getElementById('carrier-sel');
+    if(sel && sel.value !== 'all'){
+      const opt = sel.options[sel.selectedIndex];
+      const cf = (opt ? opt.textContent : '').trim();
+      if(cf){
+        const kept = [];
+        groups.forEach((g, i) => { if((g.carrier||'').includes(cf) || cf.includes(g.carrier||'')) kept.push(i); });
+        groups = kept.map(i => groups[i]);
+        gidx = kept;
+      }
+    }
+  }
   // 更新后保持卡片展开/关闭状态：重建前记录现有卡片开关（按司机名；其他门店用固定键）
   const prevOpen = {};
   document.querySelectorAll('#body-main details.group[data-gkey]').forEach(d => { prevOpen[d.dataset.gkey] = d.open; });
@@ -346,7 +362,8 @@ function render(data){
   const showPallet = document.getElementById('show-pallet-chk').checked;
   const knownN = Object.keys(DRIVERS).length;
   let shownDrv = 0;
-  groups.forEach((g, gi) => {
+  groups.forEach((g, k) => {
+    const gi = gidx[k];   // 原始下标：copyStores/按钮按它取未过滤的组数据
     const d = DRIVERS[g.driver];
     const isScattered = d ? !!d.scattered : (knownN === 0);  // 司机名单未加载到时兜底全显示
     if(!showPallet && !isScattered) return;
