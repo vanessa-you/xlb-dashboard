@@ -313,15 +313,17 @@ def _sync_drivers():
 
 def run_task(tid, run_kw=None):
     run_kw = run_kw or {}
-    if tid == 'all':
-        # 【2026-10-07 用户要求】"全部更新"只跑 待拣(2)+集货位(3)，任务1单独点"任务更新"
+    if tid in ('all', 'full'):
+        # 'all'  = 待拣(2)+集货位(3)（2026-10-07 用户要求："全部更新"原语义）
+        # 'full' = 任务1(已调度运单)+待拣(2)+集货位(3) 一次点完（2026-10-14 用户新增按钮）
+        tids = ('2', '3') if tid == 'all' else ('1', '2', '3')
         logs, ok = [], True
-        for t in ('2', '3'):
+        for t in tids:
             r = run_task(t, {'carrier': run_kw.get('carrier'), 'no_sync': True})
             logs.append(f'===== {TASKS[t]["name"]} =====\n{r["log"]}')
             ok = ok and r['ok']
         if ok and GH_SYNC:
-            threading.Thread(target=_sync_to_github, args=(('2', '3'),), daemon=True).start()
+            threading.Thread(target=_sync_to_github, args=(tids,), daemon=True).start()
             logs.append('[云端同步] 已在后台提交至 GitHub，Pages 约1分钟后生效')
         return {'ok': ok, 'log': '\n'.join(logs), 'data': read_data()}
     if tid not in TASKS:
@@ -832,7 +834,7 @@ class Handler(BaseHTTPRequestHandler):
                               ensure_ascii=False).encode()
             self._send(409, 'application/json; charset=utf-8', body); return
         try:
-            res = run_task(tid if tid in TASKS or tid == 'all' else 'all', kw)
+            res = run_task(tid if tid in TASKS or tid in ('all', 'full') else 'all', kw)
             body = json.dumps(res, ensure_ascii=False).encode()
             self._send(200, 'application/json; charset=utf-8', body)
         finally:
