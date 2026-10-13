@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://seas-dial-album-worker.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://actions-lowest-aims-jewelry.trycloudflare.com";
