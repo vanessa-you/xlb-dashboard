@@ -18,6 +18,9 @@
   .btn.refresh-all:hover { background:#23c082; }
   .btn.full-update { background:#ff7d00; }
   .btn.full-update:hover { background:#ff9a2e; }
+  /* 【2026-10-14 用户要求】顶部按钮图标化省空间：仅图标+悬浮提示 */
+  .btn.icon { width:34px; height:30px; padding:0; font-size:16px; line-height:1; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; }
+  .spin.only { margin-right:0; }
   main { width:100%; margin:16px auto 0; padding:0 16px; }
   .card { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden; }
   .card-head { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid #f0f0f0; flex-wrap:wrap; }
@@ -126,6 +129,7 @@
     header label { font-size:12px !important; margin-left:auto; }
     header select { padding:8px 10px !important; font-size:13px !important; }
     .btn.mini { padding:10px 12px; font-size:13px; }
+    .btn.icon { width:42px; height:36px; padding:0; font-size:18px; }
     .btn.refresh-all { padding:10px 14px; }
     .btn.full-update { padding:10px 14px; }
     main { padding:0 8px; margin-top:10px; }
@@ -189,11 +193,11 @@
       <option value="6666600000115">当涂原赫</option>
     </select>
   </label>
-  <button class="btn mini" id="btn-1" onclick="runTask('1')">任务更新</button>
-  <button class="btn mini" id="btn-2" onclick="runTask('2')">待拣更新</button>
-  <button class="btn mini" id="btn-3" onclick="runTask('3')">集货位更新</button>
-  <button class="btn refresh-all" id="btn-all" onclick="runTask('all')">⟳ 待拣+集货更新</button>
-  <button class="btn full-update" id="btn-full" onclick="runTask('full')" title="依次更新：任务1（已调度运单）+ 任务2（待拣）+ 任务3（集货位），一次点完">⟳ 全部更新</button>
+  <button class="btn mini icon" id="btn-1" onclick="runTask('1')" title="任务更新（已调度运单）" aria-label="任务更新">📋</button>
+  <button class="btn mini icon" id="btn-2" onclick="runTask('2')" title="待拣更新（门店待拣条数）" aria-label="待拣更新">📦</button>
+  <button class="btn mini icon" id="btn-3" onclick="runTask('3')" title="集货位更新（托盘状态）" aria-label="集货位更新">🏗️</button>
+  <button class="btn refresh-all icon" id="btn-all" onclick="runTask('all')" title="待拣+集货一起更新" aria-label="待拣+集货更新">🔄</button>
+  <button class="btn full-update icon" id="btn-full" onclick="runTask('full')" title="全部更新：任务1+待拣+集货位一次点完" aria-label="全部更新">⚡</button>
 </header>
 <div class="layout">
 <nav class="tabs">
@@ -695,9 +699,9 @@ async function runTask(tid, isRetry){
   const sel = document.getElementById('carrier-sel');
   if(sel) sel.disabled = true;
   const btn = document.getElementById('btn-'+tid);
-  const LBL = {'1':'任务更新','2':'待拣更新','3':'集货位更新','all':'⟳ 待拣+集货更新','full':'⟳ 全部更新'};
-  const old = LBL[tid] || ('更新任务'+tid);
-  if(btn) btn.innerHTML = '<span class="spin"></span>更新中…';
+  const LBL = {'1':'📋','2':'📦','3':'🏗️','all':'🔄','full':'⚡'};   // 图标按钮：更新完成后恢复图标
+  const old = LBL[tid] || '📋';
+  if(btn) btn.innerHTML = '<span class="spin only"></span>';
   try{
     let url = base + '/api/run?task='+tid;
     if(tid==='1' || tid==='all' || tid==='full'){
