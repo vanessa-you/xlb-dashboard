@@ -195,6 +195,7 @@ def ensure_credentials():
             _log(f'XLB_AUTH_B64 解码失败: {e}')
 
     # 2) 已有凭证探活（优先缓存里的 auth.json）
+    have_at, hard_expired = None, False
     if os.path.exists(AUTH):
         try:
             d = json.load(open(AUTH))
@@ -205,7 +206,9 @@ def ensure_credentials():
                     _log(f'已有凭证有效（AT尾号…{at[-6:]}），跳过登录')
                     _normalize_auth(d)   # 修复旧版本写入的 body/url 结构
                     return True
-                _log(f'已有凭证失效（{info}），尝试重新获取')
+                have_at = at
+                hard_expired = any(k in info for k in ('1005', '登陆', '登录'))
+                _log(f'已有凭证失效（{info}，{"明确过期" if hard_expired else "疑似网络异常"}），尝试重新获取')
         except Exception as e:
             _log(f'读取凭证失败: {e}')
 
@@ -215,11 +218,14 @@ def ensure_credentials():
     pwd = os.environ.get('XLB_PASSWORD')
     if not (acc and comp and pwd):
         _log('错误: 凭证失效且缺少 XLB_ACCOUNT/XLB_COMPANY_ID/XLB_PASSWORD secrets')
-        return False
+        return have_at is not None and not hard_expired
     try:
         res = login_with_retry(acc.strip(), int(comp), pwd)
     except Exception as e:
         _log(f'密码登录失败: {e}')
+        if have_at and not hard_expired:
+            _log('兜底: 登录失败但现有 AT 未明确过期（探活仅网络异常），继续用现有凭证尝试')
+            return True
         return False
     ok, info = probe_at(res['access_token'])
     if not ok:
