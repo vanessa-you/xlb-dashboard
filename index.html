@@ -41,6 +41,11 @@
   .carrier-edit:hover { border-color:#e5e6eb; background:#fff; }
   .carrier-edit:focus { border-color:#165dff; background:#fff; color:#1f2329; }
   .g-cnt { font-size:11px; color:#165dff; background:#e8f3ff; border-radius:10px; padding:1px 8px; }
+  /* 【2026-10-14】司机联系方式：车牌 + 可点击拨号的手机号 */
+  .drv-contact { display:inline-flex; align-items:center; gap:6px; margin-left:8px; white-space:nowrap; }
+  .drv-plate { font-size:11px; color:#4e5969; background:#f2f3f5; border-radius:5px; padding:1px 6px; font-weight:600; }
+  .drv-tel { font-size:11px; color:#00b578; text-decoration:none; background:#e8fffb; border-radius:5px; padding:1px 6px; font-weight:600; }
+  .drv-tel:hover { background:#00b578; color:#fff; }
   .g-none { font-size:11px; color:#c9cdd4; }
   /* 无托盘状态信息的分组：折起且不可展开 */
   details.group.no-pallet summary { cursor:default; background:#fbfbfc; }
@@ -137,7 +142,8 @@
     details.group summary { padding:10px 10px; flex-wrap:wrap; row-gap:7px; }
     /* 手机端 summary 三行：①司机姓名+劳务+店数 ②按钮 ③装车进度统计 */
     details.group summary .arrow { width:14px; flex:none; }
-    .driver-cell { order:1; flex:1 1 auto; min-width:0; }
+    .driver-cell { order:1; flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; row-gap:4px; }
+    .drv-contact { margin-left:0; }
     .g-cnt { order:2; flex:none; }
     .copy-btn, .route-btn, .depart-btn { order:3; margin-left:0; flex:1 1 0; text-align:center; padding:7px 0; font-size:12px; }
     .copy-btn { order:3; } .route-btn { order:4; } .depart-btn { order:5; }
@@ -359,6 +365,12 @@ function render(data){
     }
     const loadProg = loadStores>0
       ? `<span class="load-progress" title="该司机有 ${loadStores} 家门店已进通道（在场待装/装车中）；待装 ${palletCnt} 拖 = 已质检+拣货完成的托盘之和（不含装车中）">🚚 待装车 ${loadStores}家 · 待装 ${palletCnt}拖</span>` : '';
+    // 【2026-10-14 用户要求】司机姓名后显示车牌号+手机号，手机号可点击拨号（移动端 tel:）
+    const drvMeta = DRIVERS[g.driver] || {};
+    const plateTxt = g.plate || drvMeta.plate || '';
+    const phoneTxt = g.phone || drvMeta.phone || '';
+    const contactHtml = (plateTxt || phoneTxt)
+      ? `<span class="drv-contact">${plateTxt?`<span class="drv-plate" title="车牌号">${esc(plateTxt)}</span>`:''}${phoneTxt?`<a class="drv-tel" href="tel:${esc(phoneTxt)}" onclick="event.stopPropagation();" title="点击拨打电话（移动端）">📞 ${esc(phoneTxt)}</a>`:''}</span>` : '';
     const rows = g.stores.map(storeRow).join('');
     // 展开状态：用户点过则保持原状态；首次渲染默认有托盘信息的展开
     const gkey = esc(g.driver) || '(未知司机)';
@@ -366,7 +378,7 @@ function render(data){
     html += `<details class="group${hasPallet?'':' no-pallet'}" data-gkey="${gkey}"${open?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
       <span class="arrow">▶</span>
-      <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b><input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
+      <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b>${contactHtml}<input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
       <span class="g-cnt">${g.stores.length} 店</span>
       <button class="copy-btn" data-gi="${gi}" onclick="copyStores(this);event.preventDefault();event.stopPropagation();" title="复制该司机名下门店列表，用于发送给司机">复制门店</button>
       <button class="route-btn" data-driver="${esc(g.driver)}" onclick="storeRoute(this);event.preventDefault();event.stopPropagation();" title="按从马鞍山顺丰丰泰产业园出发的货车最优路线排序该司机名下门店">门店排序</button>
@@ -585,8 +597,11 @@ function renderDrivers(j){
       ? '<span class="drv-badge">显示中</span>'
       : '<span class="drv-badge" style="background:#e8f3ff;color:#165dff">已隐藏</span>';
     const carrier = esc(d.carrier || '-');
+    // 【2026-10-14】姓名后显示车牌+手机号，手机号可点击拨号
+    const contact = (d.plate || d.phone)
+      ? `<span class="drv-contact">${d.plate?`<span class="drv-plate">${esc(d.plate)}</span>`:''}${d.phone?`<a class="drv-tel" href="tel:${esc(d.phone)}" title="点击拨打电话（移动端）">📞 ${esc(d.phone)}</a>`:''}</span>` : '';
     return `<tr>
-      <td><span class="drv-name">${esc(d.name)}</span></td>
+      <td><span class="drv-name">${esc(d.name)}</span>${contact}</td>
       <td>${carrier}</td>
       <td>
         <label class="drv-radio"><input type="radio" name="drv-${esc(d.name)}" data-on="1"${show?' checked':''} onclick="toggleShow('${esc(d.name)}',1)">显示</label>
