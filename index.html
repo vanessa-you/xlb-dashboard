@@ -462,7 +462,8 @@ async function ensureTunnel(){
   return LIVE_URL;
 }
 
-// 门店待拣订单加急：服务端按任务2快照里的 fid 批量调 addpriority，成功后 2 秒自动刷新待拣
+// 门店待拣订单加急：服务端按任务2快照里的 fid 批量调 addpriority
+// 【2026-10-14 用户要求】加急成功后不再自动刷新待拣（避免打断当前浏览）
 async function rushStore(btn){
   const store = btn.dataset.store;
   if(!store || btn.disabled) return;
@@ -478,7 +479,7 @@ async function rushStore(btn){
     const j = await r.json();
     if(j.ok){
       btn.innerHTML = '已加急✓';
-      setTimeout(()=>runTask('2'), 2000);   // 2 秒后刷新待拣数据
+      // 2026-10-14：不自动刷新待拣，页面数据保持不变（手动点「待拣更新」即可刷新）
     }else{
       btn.innerHTML = old; btn.disabled = false;
       alert('加急失败：' + (j.msg || '未知错误'));
