@@ -45,7 +45,19 @@ jobs:
           git add data_task1.json data_task2.json data_task3.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
-          else
-            git commit -m "data: $(TZ=Asia/Shanghai date +%FT%T)"
-            git push
+            exit 0
           fi
+          git commit -m "data: $(TZ=Asia/Shanghai date +%FT%T)"
+          # 【2026-10-15】并发冲突修复：本机看门狗/手动推送可能同时提交（如 tunnel_url.js），
+          # 直接 push 会被 rejected(fetch first) 导致整轮失败 → 改为 rebase 拉取后重试推送
+          for i in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
+              echo "推送成功（第 $i 次尝试）"
+              exit 0
+            fi
+            echo "第 $i 次推送失败，5 秒后重试…"
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "推送重试多次仍失败" >&2
+          exit 1
