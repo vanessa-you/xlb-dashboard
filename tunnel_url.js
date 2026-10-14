@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://lance-struck-concrete-optional.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://labeled-earnings-smithsonian-understanding.trycloudflare.com";
