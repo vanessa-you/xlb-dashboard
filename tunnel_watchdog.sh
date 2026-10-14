@@ -28,6 +28,12 @@ touch "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 
 # ---- 1) 看板服务 ----
+# 【2026-10-15】/tmp 会被系统不定期清理 → 服务与任务脚本丢失导致看板整站挂掉。
+# 检测到 /tmp/xlb_web/server.py 缺失时先自愈恢复（从 xlb_gh 备份拷回 + 必要时密码登录重建凭证）
+if [ ! -f /tmp/xlb_web/server.py ]; then
+  echo "$(date '+%F %T') 检测到 /tmp 运行环境缺失，执行自愈恢复" >> "$LOG"
+  bash "$DIR/restore_tmp.sh" >> "$LOG" 2>&1
+fi
 if ! curl -s -o /dev/null --max-time 5 http://localhost:8787/; then
   echo "$(date '+%F %T') 看板服务无响应，尝试拉起" >> "$LOG"
   (XLB_BIND=0.0.0.0 XLB_GH_SYNC=0 nohup "$PY" /tmp/xlb_web/server.py >> /tmp/xlb_server.log 2>&1 &)
@@ -41,14 +47,19 @@ tunnel_url() {
 }
 
 # 探测隧道是否可达：策略1 经系统代理；策略2 公共DNS解析后直连
+# 【2026-10-15 修复】必须校验 HTTP 状态码：Cloudflare 隧道掉线时会返回 530/1033 错误页，
+# 而 curl 对 530 的退出码仍是 0 —— 旧版只看退出码 → 误判"隧道正常"，永远不重启。
 probe() {
-  local u="$1" ip
+  local u="$1" ip code
   [ -z "$u" ] && return 1
-  curl -s -o /dev/null --max-time 12 "$u/" && return 0
+  code=$(curl -s -o /dev/null -L --max-time 12 -w '%{http_code}' "$u/" 2>/dev/null)
+  [ "$code" = "200" ] && return 0
   ip=$(dig +short @1.1.1.1 "${u#https://}" 2>/dev/null | grep -E '^[0-9.]+$' | head -1)
   if [ -n "$ip" ]; then
-    curl -s -o /dev/null --max-time 12 --noproxy '*' --resolve "${u#https://}:443:$ip" "$u/" && return 0
-    curl -s -o /dev/null --max-time 12 --resolve "${u#https://}:443:$ip" "$u/" && return 0
+    code=$(curl -s -o /dev/null -L --max-time 12 -w '%{http_code}' --noproxy '*' --resolve "${u#https://}:443:$ip" "$u/" 2>/dev/null)
+    [ "$code" = "200" ] && return 0
+    code=$(curl -s -o /dev/null -L --max-time 12 -w '%{http_code}' --resolve "${u#https://}:443:$ip" "$u/" 2>/dev/null)
+    [ "$code" = "200" ] && return 0
   fi
   return 1
 }
