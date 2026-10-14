@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://container-preview-milk-dui.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://lance-struck-concrete-optional.trycloudflare.com";
