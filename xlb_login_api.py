@@ -182,6 +182,13 @@ def write_auth(res):
     cookies = '; '.join(f'{k}={v}' for k, v in ck.items())
 
     new = dict(old)
+    # 【2026-10-16】auth.json 不存在（如 /tmp 被清后）时补默认 url/body，
+    # 否则 task2/task3 会因 KeyError: 'body' 失败（业务域 WMS 网关与查询体是固定值）
+    if not new.get('url'):
+        new['url'] = 'https://wms-web.wms.ali-prod.xlbsoft.com/wms/hxl.wms.distribute.center.find'
+    if not new.get('body'):
+        new['body'] = {'operator_store_id': 6666600000001, 'company_id': 66666, 'client_ids': [],
+                       'storehouse_id': 6666600000134, 'store_id': 6666600000001, 'region_ids': []}
     new['access_token'] = res['access_token']
     if jwt:
         new['authorization'] = f'{res["token_type"]} Bearer'.replace('Bearer Bearer', 'Bearer') \
