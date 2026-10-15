@@ -71,7 +71,7 @@ def tdoc(tool, args):
 # ---------- 1. 参数解析：时间 + 司机姓名 ----------
 def parse_args(argv):
     argv = [a for a in argv if a != '--nowrite']
-    drivers, date = [], None
+    drivers, date, all_flag = [], None, False
     if '-n' in argv:  # 旧风格：日期 ... -n 名字...
         i = argv.index('-n')
         drivers = [x for x in argv[i+1:] if x]
@@ -99,8 +99,16 @@ def parse_args(argv):
             drivers += parts
     if not date:
         date = datetime.date.today().strftime('%Y-%m-%d')
+    # 关键词（2026-10-13 用户约定；2026-10-15 补回被 /tmp 恢复覆盖的版本）
+    #   「所有司机 / 全部司机 / 所有 / 全部 / 所有人」→ 不筛选，查当天全部司机
+    #   「默认司机 / 默认名单 / 默认」              → 用 DEFAULT_DRIVERS（默认 8 人）
+    #   两者同时出现（如「默认所有」）→ 以「所有」为准
+    if any(('所有' in d) or ('全部' in d) for d in drivers):
+        all_flag, drivers = True, []
+    elif any('默认' in d for d in drivers):
+        drivers = list(DEFAULT_DRIVERS)
     # 没给司机 → 用默认名单（可用 XLB_DRIVERS 覆盖）；给了就按给的来
-    if not drivers:
+    if not drivers and not all_flag:
         env_d = [x.strip() for x in re.split(r'[，,;；\s]+', os.environ.get('XLB_DRIVERS', '')) if x.strip()]
         drivers = env_d or list(DEFAULT_DRIVERS)
     return date, drivers
