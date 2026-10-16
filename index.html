@@ -40,9 +40,8 @@
   .driver-cell b { font-size:13px; }
   .driver-cell b.loading { color:#00B050; }
   .driver-cell span { font-size:11px; color:#86909c; margin-left:8px; }
-  .carrier-edit { font-size:11px; color:#86909c; margin-left:8px; width:88px; padding:2px 6px; border:1px solid transparent; border-radius:5px; background:transparent; outline:none; }
-  .carrier-edit:hover { border-color:#e5e6eb; background:#fff; }
-  .carrier-edit:focus { border-color:#165dff; background:#fff; color:#1f2329; }
+  .carrier-edit { font-size:11px; color:#86909c; margin-left:8px; padding:2px 6px; border-radius:5px; }
+  .carrier-edit:empty { display:none; }
   .g-cnt { font-size:11px; color:#165dff; background:#e8f3ff; border-radius:10px; padding:1px 8px; }
   /* 【2026-10-14】司机联系方式：车牌 + 可点击拨号的手机号 */
   .drv-contact { display:inline-flex; align-items:center; gap:6px; margin-left:8px; white-space:nowrap; }
@@ -418,7 +417,7 @@ function renderInner(data){
     html += `<details class="group${hasPallet?'':' no-pallet'}" data-gkey="${gkey}"${open?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
       <span class="arrow">▶</span>
-      <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b>${contactHtml}<input class="carrier-edit" value="${esc(carrierOf(g))}" placeholder="劳务名称" title="点击可编辑劳务名称，修改后自动保存" onclick="event.preventDefault();event.stopPropagation();" onkeydown="event.stopPropagation();" onchange="saveCarrier(this,'${esc(g.driver).replace(/'/g,"\\'")}');this.blur()"></span>
+      <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b>${contactHtml}<span class="carrier-edit" title="劳务名称">${esc(carrierOf(g))}</span></span>
       <span class="g-cnt">${g.stores.length} 店</span>
       <button class="copy-btn" data-gi="${gi}" onclick="copyStores(this);event.preventDefault();event.stopPropagation();" title="复制该司机名下门店列表，用于发送给司机">复制门店</button>
       <button class="route-btn" data-driver="${esc(g.driver)}" onclick="storeRoute(this);event.preventDefault();event.stopPropagation();" title="按从马鞍山顺丰丰泰产业园出发的货车最优路线排序该司机名下门店">门店排序</button>
