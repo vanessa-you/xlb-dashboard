@@ -351,6 +351,7 @@ function renderInner(data){
   };
 
   let html = '';
+  let selCf = '';   // 当前选中的劳务名称（'' = 全部供应商）
   let groups = (t1 && t1.groups) || [];
   let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（copyStores 按 data-gi 取原始组）
   // 【2026-10-14 用户要求】列表跟随供应商下拉框：下拉框选了某劳务（默认当涂云顺）时，
@@ -359,10 +360,10 @@ function renderInner(data){
     const sel = document.getElementById('carrier-sel');
     if(sel && sel.value !== 'all'){
       const opt = sel.options[sel.selectedIndex];
-      const cf = (opt ? opt.textContent : '').trim();
-      if(cf){
+      selCf = (opt ? opt.textContent : '').trim();
+      if(selCf){
         const kept = [];
-        groups.forEach((g, i) => { if((g.carrier||'').includes(cf) || cf.includes(g.carrier||'')) kept.push(i); });
+        groups.forEach((g, i) => { if((g.carrier||'') && ((g.carrier||'').includes(selCf) || selCf.includes(g.carrier||''))) kept.push(i); });
         if(kept.length){          // 【保护】全部滤光（如旧快照无 carrier 字段）时保留原列表
           groups = kept.map(i => groups[i]);
           gidx = kept;
@@ -432,6 +433,17 @@ function renderInner(data){
   const extra = [];
   for(const k in stores) if(!used3.has(k)) extra.push(k);
   for(const k in counts) if(!used2.has(k) && !extra.includes(k)) extra.push(k);
+  // 【2026-10-17】选中具体劳务时，其他门店排除明确属于其他劳务司机的门店
+  // （否则逍蜂/原赫等司机的门店全塞进「其他门店」，看起来像筛选没生效）
+  if(selCf){
+    const allGroups = (t1 && t1.groups) || [];
+    const otherStore = k => allGroups.some(g => {
+      const c = g.carrier || '';
+      if(!c || c.includes(selCf) || selCf.includes(c)) return false;   // 同劳务或未知劳务不排除
+      return (g.stores || []).some(n => n && (n.includes(k) || k.includes(n)));
+    });
+    for(let i = extra.length - 1; i >= 0; i--) if(otherStore(extra[i])) extra.splice(i, 1);
+  }
   if(extra.length){
     const rows = extra.map(storeRow).join('');
     const extraOpen = ('__extra__' in prevOpen) ? prevOpen['__extra__'] : false;
