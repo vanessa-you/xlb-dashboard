@@ -282,6 +282,20 @@ function find3(stores, name){
 }
 
 function render(data){
+  // 【2026-10-17】渲染全程保护：任何异常都保留原列表，绝不清空页面
+  const bodyEl = document.getElementById('body-main');
+  const prevHtml = bodyEl ? bodyEl.innerHTML : '';
+  try{
+    renderInner(data);
+  }catch(e){
+    if(prevHtml && bodyEl) bodyEl.innerHTML = prevHtml;
+    const sub = document.getElementById('sub-main');
+    if(sub) sub.textContent = '⚠️ 本次渲染异常已保留原列表（' + (e && e.message || e) + '）';
+    console.error('render 异常:', e);
+  }
+}
+
+function renderInner(data){
   LAST = data;
   const t1 = data['1'], t2 = data['2'], t3 = data['3'];
   const times = [];
@@ -350,8 +364,10 @@ function render(data){
       if(cf){
         const kept = [];
         groups.forEach((g, i) => { if((g.carrier||'').includes(cf) || cf.includes(g.carrier||'')) kept.push(i); });
-        groups = kept.map(i => groups[i]);
-        gidx = kept;
+        if(kept.length){          // 【保护】全部滤光（如旧快照无 carrier 字段）时保留原列表
+          groups = kept.map(i => groups[i]);
+          gidx = kept;
+        }
       }
     }
   }
@@ -362,11 +378,14 @@ function render(data){
   const showPallet = document.getElementById('show-pallet-chk').checked;
   const knownN = Object.keys(DRIVERS).length;
   let shownDrv = 0;
+  // 【保护】先算将显示数量：若司机过滤会把所有卡片滤光，则本次忽略过滤（避免列表整页消失）
+  const willShow = groups.filter(g => { const d = DRIVERS[g.driver]; return showPallet || !d || !!d.scattered || knownN === 0; }).length;
+  const filterDrv = willShow > 0 || groups.length === 0;
   groups.forEach((g, k) => {
     const gi = gidx[k];   // 原始下标：copyStores/按钮按它取未过滤的组数据
     const d = DRIVERS[g.driver];
     const isScattered = d ? !!d.scattered : (knownN === 0);  // 司机名单未加载到时兜底全显示
-    if(!showPallet && !isScattered) return;
+    if(filterDrv && !showPallet && !isScattered) return;
     shownDrv++;
     // 名下门店全都没有托盘状态信息（任务3未收录）→ 默认折起且禁止展开
     const hasPallet = g.stores.some(n => { const s = find3(stores, n); return s && s.e.pallets && s.e.pallets.length; });
