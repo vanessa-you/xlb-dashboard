@@ -466,24 +466,35 @@ def _departure_info(driver, date_str=None):
                 'total': len(mine)}
     trans.sort(key=lambda o: str(o.get('pick_time') or o.get('loading_start_time') or ''), reverse=True)
     first = trans[0]
-    clients, seen = [], set()
+    # 【2026-10-17】门店后附整件数+打包数（delivery_whole_quantity+delivery_pack_quantity，同门店多单求和）
+    clients = []          # [(client_name, whole, pack)]
+    _seen = {}
     for o in trans:
         c = (o.get('client_name') or '').strip()
-        if c and c not in seen:
-            seen.add(c)
-            clients.append(c)
+        if not c:
+            continue
+        wq = o.get('delivery_whole_quantity') or 0
+        pq = o.get('delivery_pack_quantity') or 0
+        if c in _seen:
+            i = _seen[c]
+            clients[i] = (c, clients[i][1] + (wq if isinstance(wq, (int, float)) else 0),
+                          clients[i][2] + (pq if isinstance(pq, (int, float)) else 0))
+        else:
+            _seen[c] = len(clients)
+            clients.append((c, wq if isinstance(wq, (int, float)) else 0,
+                            pq if isinstance(pq, (int, float)) else 0))
     # 目的地城市 = 门店名开头的地级市（三字城市优先匹配，否则取前两字）；下方逐条列收货客户
     city = ''
     if clients:
         seen_c, cs = set(), []
-        for c in clients:
+        for c, _, _ in clients:
             p = _city_of(c)
             if p not in seen_c:
                 seen_c.add(p)
                 cs.append(p)
         city = '/'.join(cs)
     kms = [o.get('total_kilometers') for o in trans if isinstance(o.get('total_kilometers'), (int, float))]
-    km_txt = f'{round(min(kms))}公里' if kms else ''
+    km_meta = f'{round(min(kms))}公里' if kms else ''   # 仅用于弹框副标题展示
     month, day = int(date_str[5:7]), int(date_str[8:10])
     lines = [f'开始时间：{month}月{day}日',
              f"姓名: {driver}",
@@ -493,15 +504,18 @@ def _departure_info(driver, date_str=None):
              f"项目:{DEPART_TPL['project']}",
              f"出发地:{DEPART_TPL['origin']}",
              f'目的地：{city}']
-    for i, c in enumerate(clients, 1):
-        lines.append(f'{i}. {c}')
-    if km_txt:
-        lines.append('')  # 高德导航公里数上方空一行（2026-10-09 用户要求）
-        lines.append(f'高德导航最低公里数{km_txt}')
-    lines.append(f"异常处理电话：{DEPART_TPL['exception_tel']}")
+    for i, (c, wq, pq) in enumerate(clients, 1):
+        lines.append(f'{i}. {c} {int(wq)}+{int(pq)}')
+    # 【2026-10-17】公里数留空由司机自行填写高德导航结果
+    lines.append('')  # 高德导航公里数上方空一行（2026-10-09 用户要求）
+    lines.append('高德导航最低公里数    公里')
+    # 【2026-10-17】仅云顺显示异常处理电话，其他供应商留空
+    carrier_name = first.get('carrier_name') or ''
+    exc_tel = DEPART_TPL['exception_tel'] if '云顺' in carrier_name else ''
+    lines.append(f'异常处理电话：{exc_tel}')
     return {'ok': True, 'driver': driver, 'date': date_str,
             'text': '\n'.join(lines), 'orders': len(trans),
-            'clients': clients, 'km': km_txt,
+            'clients': [c for c, _, _ in clients], 'km': km_meta,
             'raw': [{'client': o.get('client_name'), 'pick_time': o.get('pick_time'),
                      'loading_start_time': o.get('loading_start_time'),
                      'km': o.get('total_kilometers'), 'fid': o.get('fid')} for o in trans]}
