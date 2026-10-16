@@ -372,6 +372,8 @@ def run_task(tid, run_kw=None):
         lines.append('[云端同步] 已在后台提交至 GitHub，Pages 约1分钟后生效')
     return {'ok': ok, 'log': '\n'.join(lines), 'data': read_data()}
 
+_LAST_GOOD_DATA = {}   # 【2026-10-17】各任务最近一次成功读取的快照（瞬时损坏/写一半时兜底）
+
 def read_data():
     try:
         _sync_drivers()
@@ -383,8 +385,9 @@ def read_data():
             j = json.load(open(path))
             j['task'] = t
             d[t] = j
+            _LAST_GOOD_DATA[t] = j
         except Exception:
-            d[t] = None
+            d[t] = _LAST_GOOD_DATA.get(t)   # 快照读失败（写一半/缺失）时用上次成功数据，避免前端列表消失
     return d
 
 # 【2026-10-06】门店待拣订单加急：hxl.wms.pickorder.addpriority，fids 来自任务2快照
