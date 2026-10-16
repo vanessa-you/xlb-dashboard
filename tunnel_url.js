@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://orange-powerful-mountains-brake.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://officer-willow-ambien-spoken.trycloudflare.com";
