@@ -505,7 +505,7 @@ def _departure_info(driver, date_str=None):
              f"出发地:{DEPART_TPL['origin']}",
              f'目的地：{city}']
     for i, (c, wq, pq) in enumerate(clients, 1):
-        lines.append(f'{i}. {c} {int(wq)}+{int(pq)}')
+        lines.append(f'{i}. {c}')
     # 【2026-10-17】公里数留空由司机自行填写高德导航结果
     lines.append('')  # 高德导航公里数上方空一行（2026-10-09 用户要求）
     lines.append('高德导航最低公里数    公里')
