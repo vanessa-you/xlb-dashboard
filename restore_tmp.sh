@@ -30,6 +30,11 @@ for f in task1.py task2.py task3_direct.py task5.py task7.py xlb_login_api.py; d
   copy "$DIR/$f" "/tmp/$f"
 done
 
+# GitHub token（推 Pages 快照用）：缺失则从仓库外持久位置补
+if [ -f "$HOME/.xlb_gh_token" ] && [ ! -f /tmp/gh_token.txt ]; then
+  cp -f "$HOME/.xlb_gh_token" /tmp/gh_token.txt && echo "恢复 /tmp/gh_token.txt"
+fi
+
 # 凭证：缺失则用密码登录重建（脚本内无明文密码，参数来自 ~/.xlb_login.json）
 if [ ! -f /tmp/xlb_auth.json ] && [ -f /tmp/xlb_login_api.py ] && [ -f "$HOME/.xlb_login.json" ]; then
   echo "凭证缺失，执行密码登录重建…"
