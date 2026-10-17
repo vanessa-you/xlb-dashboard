@@ -184,7 +184,7 @@
   <h1>🚚 新零帮调度看板</h1>
   <span id="update-time">加载中…</span>
   <label style="font-size:12.5px;color:#4e5969;display:flex;align-items:center;gap:6px;">供应商
-    <select id="carrier-sel" onchange="runTask('1')" style="padding:5px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;">
+    <select id="carrier-sel" onchange="onCarrierChange()" style="padding:5px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;">
       <option value="all">全部供应商</option>
       <option value="6666600000863" selected>当涂云顺</option>
       <option value="6666600000749">当涂日日顺</option>
@@ -734,8 +734,16 @@ function copyDepartText(btn){
   copyText(document.getElementById('depart-text').value, btn, '复制');
 }
 
+// 【2026-10-18】供应商下拉框：直接用本地快照即时过滤重渲染（不再重新拉数）
+function onCarrierChange(){
+  if(LAST){ render(LAST); }
+  else { runTask('1'); }   // 尚无数据时才触发拉取
+}
+
 async function runTask(tid, isRetry){
   if(running) return;
+  // 【2026-10-18 修复】任务1永远拉全部供应商：之前按下拉框供应商拉数会把快照覆盖成
+  // 只有一家的数据，切到其它供应商时列表显示错误司机。供应商过滤改为纯前端即时过滤。
   // 静态镜像（Pages）：经隧道转发到本机执行；隧道未开启则提示
   const base = STATIC_MODE ? await ensureTunnel() : '';
   if(STATIC_MODE && !base){
@@ -753,8 +761,7 @@ async function runTask(tid, isRetry){
   try{
     let url = base + '/api/run?task='+tid;
     if(tid==='1' || tid==='all' || tid==='full'){
-      const cv = sel ? sel.value : 'all';
-      url += '&carrier='+encodeURIComponent(cv);
+      url += '&carrier=all';   // 快照始终全量，页面按下拉框前端过滤
     }
     // 超时保护：请求卡死时自动中断，避免 running 卡住导致按钮永久失效
     // （全部更新要连跑 3 个任务，给更长的等待时间）
