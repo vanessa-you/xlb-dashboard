@@ -414,7 +414,8 @@ function renderInner(data){
     const rows = g.stores.map(storeRow).join('');
     // 展开状态：用户点过则保持原状态；首次渲染默认有托盘信息的展开
     const gkey = esc(g.driver) || '(未知司机)';
-    const open = (gkey in prevOpen) ? prevOpen[gkey] : hasPallet;
+    // 【2026-10-18 用户要求】没有集货信息的司机一律收起面板（即使之前是展开状态）
+    const open = hasPallet && ((gkey in prevOpen) ? prevOpen[gkey] : true);
     html += `<details class="group${hasPallet?'':' no-pallet'}" data-gkey="${gkey}"${open?' open':''}>
       <summary onclick="if(this.parentNode.classList.contains('no-pallet')){event.preventDefault();}">
       <span class="arrow">▶</span>
