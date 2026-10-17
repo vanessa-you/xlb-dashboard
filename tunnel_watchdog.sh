@@ -37,14 +37,14 @@ if [ ! -f /tmp/xlb_web/server.py ]; then
 fi
 if ! curl -s -o /dev/null --max-time 5 http://localhost:8787/; then
   echo "$(date '+%F %T') 看板服务无响应，尝试拉起" >> "$LOG"
-  (XLB_BIND=0.0.0.0 XLB_GH_SYNC=0 nohup "$PY" /tmp/xlb_web/server.py >> /tmp/xlb_server.log 2>&1 &)
+  (XLB_BIND=0.0.0.0 XLB_GH_SYNC=1 nohup "$PY" /tmp/xlb_web/server.py >> /tmp/xlb_server.log 2>&1 &)
 fi
 
-# 【2026-10-15】云端拉数保活：每 5 分钟触发一次 GH Actions dispatch
-# （GitHub 免费版 schedule 延迟常达 15-50 分钟；交给 cron 更稳，不依赖任何会话）
-if [ "$(( $(date +%M) % 5 ))" -eq 0 ]; then
-  (bash "$DIR/ping_workflow.sh" >> /tmp/xlb_ping.log 2>&1 &)
-fi
+# 【2026-10-17 用户要求】取消定时拉数：只有手动点看板按钮才更新数据
+# （原每 5 分钟 GH Actions dispatch 已停用；ping_workflow.sh 也已置为空操作）
+# if [ "$(( $(date +%M) % 5 ))" -eq 0 ]; then
+#   (bash "$DIR/ping_workflow.sh" >> /tmp/xlb_ping.log 2>&1 &)
+# fi
 
 # 提取真实隧道地址：快速隧道主机名形如 xxx-yyy-zzz-www.trycloudflare.com（≥2 个连字符）
 # 必须排除 api./update./region* 等非隧道主机（曾把日志里的 API 域名误推 Pages）
