@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://looks-cumulative-stanley-staffing.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://compile-rejected-electronics-detector.trycloudflare.com";
