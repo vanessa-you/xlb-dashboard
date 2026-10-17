@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://petroleum-recently-individually-sensitive.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://enormous-grill-andrea-marking.trycloudflare.com";
