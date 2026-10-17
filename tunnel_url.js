@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://lease-furniture-albany-unified.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://armstrong-releases-copyrights-delays.trycloudflare.com";
