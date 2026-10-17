@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://enormous-grill-andrea-marking.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://ripe-league-revenue-first.trycloudflare.com";
