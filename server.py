@@ -735,20 +735,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def _deny(self):
         body = b'401 Unauthorized'
-        self.send_response(401)
-        self.send_header('WWW-Authenticate', 'Basic realm="XLB Dashboard"')
-        self.send_header('Content-Type', 'text/plain; charset=utf-8')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(401)
+            self.send_header('WWW-Authenticate', 'Basic realm="XLB Dashboard"')
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _send(self, code, ctype, body):
-        self.send_response(code)
-        self.send_header('Content-Type', ctype)
-        self.send_header('Content-Length', str(len(body)))
-        self.send_header('Access-Control-Allow-Origin', '*')  # 允许 GitHub Pages 页面调用本机更新按钮
-        self.end_headers()
-        self.wfile.write(body)
+        # 【2026-10-17】客户端提前断开（BrokenPipe / ConnectionReset）时不能让整个服务崩溃：
+        # 旧版未捕获 → 手机/浏览器取消请求就把进程带崩，看板随之失联。
+        try:
+            self.send_response(code)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Access-Control-Allow-Origin', '*')  # 允许 GitHub Pages 页面调用本机更新按钮
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def do_GET(self):
         if not self._check_auth():
