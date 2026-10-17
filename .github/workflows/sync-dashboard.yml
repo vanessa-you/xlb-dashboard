@@ -1,8 +1,7 @@
 name: sync-dashboard
 on:
-  schedule:
-    - cron: '*/5 * * * *'   # 每5分钟云端拉一次最新数据
-  workflow_dispatch: {}      # 支持手动触发
+  # 【2026-10-17 用户要求】取消每 5 分钟定时拉数：只有手动点看板按钮才更新数据
+  workflow_dispatch: {}      # 仅支持手动/按钮触发
 permissions:
   contents: write
 concurrency:
