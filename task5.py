@@ -16,7 +16,7 @@ import json, os, subprocess, sys, urllib.request, datetime, re
 
 # 默认司机名单（2026-10-10 用户指定）：不带司机参数时只查这些人
 # 优先级：命令行 > 环境变量 XLB_DRIVERS（逗号分隔）> 下面的默认名单
-DEFAULT_DRIVERS = ['张家志', '王勇', '刘习', '黄镇', '梁奥琪', '许祥', '左肖', '王杭军']
+DEFAULT_DRIVERS = ['张家志', '王勇', '黄镇', '梁奥琪', '许祥', '左肖', '王杭军']
 
 # ---------- 0. token 自举 ----------
 def _bootstrap_env():
@@ -101,7 +101,7 @@ def parse_args(argv):
         date = datetime.date.today().strftime('%Y-%m-%d')
     # 关键词（2026-10-13 用户约定；2026-10-15 补回被 /tmp 恢复覆盖的版本）
     #   「所有司机 / 全部司机 / 所有 / 全部 / 所有人」→ 不筛选，查当天全部司机
-    #   「默认司机 / 默认名单 / 默认」              → 用 DEFAULT_DRIVERS（默认 8 人）
+    #   「默认司机 / 默认名单 / 默认」              → 用 DEFAULT_DRIVERS（默认 7 人）
     #   两者同时出现（如「默认所有」）→ 以「所有」为准
     if any(('所有' in d) or ('全部' in d) for d in drivers):
         all_flag, drivers = True, []
