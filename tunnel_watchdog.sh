@@ -97,7 +97,7 @@ echo "$(date '+%F %T') 连续失败，重启命名隧道 $TUNNAME…" >> "$LOG"
 pkill -x cloudflared 2>/dev/null
 sleep 2
 rm -f "$TUNLOG"
-nohup "$CF" tunnel --config "$HOME/.cloudflared/config.yml" run "$TUNNAME" >> "$TUNLOG" 2>&1 &
+nohup "$CF" tunnel --protocol http2 --config "$HOME/.cloudflared/config.yml" run "$TUNNAME" >> "$TUNLOG" 2>&1 &
 NEW=""
 for i in $(seq 1 30); do
   sleep 2
