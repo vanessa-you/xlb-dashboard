@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://programme-remote-manor-minor.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://events-flex-generators-rising.trycloudflare.com";
