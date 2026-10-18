@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://lawyer-shine-question-mambo.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://driver-creates-readers-dividend.trycloudflare.com";
