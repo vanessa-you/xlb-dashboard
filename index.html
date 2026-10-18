@@ -725,6 +725,7 @@ async function runTask(tid, isRetry){
   document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
   const btn = document.getElementById('btn-'+tid);
   const LBL = {'1':'☰','2':'⇩','3':'▦','all':'⟳','full':'⚡'};   // 图标按钮：更新完成后恢复图标
+  const TITLES = {'1':'任务更新','2':'待拣更新','3':'集货位更新','all':'待拣+集货更新','full':'全部更新'};
   const old = LBL[tid] || '📋';
   if(btn) btn.innerHTML = '<span class="spin only"></span>';
   try{
@@ -745,21 +746,25 @@ async function runTask(tid, isRetry){
     const box = document.getElementById('log-box'), pre = document.getElementById('log-pre');
     pre.textContent = (j.ok?'✅ 执行完成\n':'❌ 执行失败\n') + (j.log||'');
     box.style.display = 'block';
-    if(btn) btn.innerHTML = old;
+    if(btn){ btn.innerHTML = old; btn.title = TITLES[tid] || ''; }
   }catch(e){
     // 静态镜像下失败的两类原因，都要自动重试：
     //  ① 隧道地址已过期（隧道重启后地址变了）→ 重取 tunnel_url.js，换址立即重试
     //  ② 隧道瞬时抖动（cloudflared 与边缘断连 1~3 秒后自动重连，地址不变）
     //     → 只等 2.5 秒原地重试（【2026-10-15 修复】之前地址不变就不重试，会直接弹失败）
-    if(STATIC_MODE && (isRetry || 0) < 2){
+    // 【2026-10-18 加长重试窗口】快速隧道被回收后，看门狗重启约 1~2 分钟、新地址推到
+    // Pages 再需 1~2 分钟 —— 旧版只重试 2 次（2.5 秒）根本熬不过这个窗口，用户只能干等。
+    // 改为 4 次阶梯等待（2s/12s/25s/40s，合计约 1.5 分钟），每次先重取入口，换址立即重试。
+    const WAITS = [2000, 12000, 25000, 40000];
+    if(STATIC_MODE && (isRetry || 0) < WAITS.length){
       const attempt = isRetry || 0;
       const oldUrl = LIVE_URL;
       LIVE_URL = '';
       const nb = await ensureTunnel();
       if(nb && nb !== oldUrl) return runTask(tid, attempt + 1);   // 换址：立即重试
       if(nb) {
-        if(btn) btn.innerHTML = '<span class="spin only"></span>';
-        await new Promise(r => setTimeout(r, 2500));              // 同址：等边缘恢复
+        if(btn){ btn.innerHTML = '<span class="spin only"></span>'; btn.title = `隧道恢复中，自动第 ${attempt+2} 次尝试…`; }
+        await new Promise(r => setTimeout(r, WAITS[attempt]));     // 同址：等边缘恢复/等新地址推送
         return runTask(tid, attempt + 1);
       }
       LIVE_URL = oldUrl;   // 连入口都拉不到，走下面的失败提示
@@ -768,9 +773,9 @@ async function runTask(tid, isRetry){
       ? '请求超过 3 分钟未响应，已中断。任务可能仍在 Mac 上后台执行，稍后刷新页面查看结果。'
       : (e && e.message) || String(e);
     alert(STATIC_MODE
-      ? '更新失败：'+detail+'\n（已自动重试 2 次仍失败；通常是 Mac 上隧道正在重连，等 10 秒后再点一次即可。页面仍显示最近一次同步的数据）'
+      ? '更新失败：'+detail+'\n（已自动重试 4 次、约 1.5 分钟仍失败；通常是 Mac 上隧道正在重启换址，再等半分钟点一次即可。页面仍显示最近一次同步的数据）'
       : '请求失败: '+detail);
-    if(btn) btn.innerHTML = old;
+    if(btn){ btn.innerHTML = old; btn.title = TITLES[tid] || ''; }
   }finally{
     running = false;
     document.querySelectorAll('.btn').forEach(b=>b.disabled=false);
