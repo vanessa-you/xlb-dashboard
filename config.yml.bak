@@ -1,0 +1,11 @@
+tunnel: 81c9e767-aa33-4102-8659-a94accb2df6a
+credentials-file: /Users/youww/.cloudflared/81c9e767-aa33-4102-8659-a94accb2df6a.json
+# 【2026-10-19】强制 http2（TCP 7844）：本机网络凌晨会掐断 QUIC/UDP，
+# 默认 quic 协议导致边缘连接全部超时（530），快速隧道时代强制 http2 一直稳定
+protocol: http2
+originRequest:
+  connectTimeout: 30s
+ingress:
+  - hostname: xlb.hepinggh.cn
+    service: http://localhost:8787
+  - service: http_status:404
