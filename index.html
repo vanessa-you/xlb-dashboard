@@ -183,15 +183,6 @@
 <header>
   <h1>🚚 新零帮调度看板</h1>
   <span id="update-time">加载中…</span>
-  <label style="font-size:12.5px;color:#4e5969;display:flex;align-items:center;gap:6px;">供应商
-    <select id="carrier-sel" onchange="onCarrierChange()" style="padding:5px 8px;border:1px solid #e5e6eb;border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;">
-      <option value="all">全部供应商</option>
-      <option value="6666600000863" selected>当涂云顺</option>
-      <option value="6666600000749">当涂日日顺</option>
-      <option value="6666600000114">当涂逍蜂</option>
-      <option value="6666600000115">当涂原赫</option>
-    </select>
-  </label>
   <button class="btn mini icon" id="btn-1" onclick="runTask('1')" title="任务更新" aria-label="任务更新">☰</button>
   <button class="btn mini icon" id="btn-2" onclick="runTask('2')" title="待拣更新" aria-label="待拣更新">⇩</button>
   <button class="btn mini icon" id="btn-3" onclick="runTask('3')" title="集货位更新" aria-label="集货位更新">▦</button>
@@ -200,8 +191,9 @@
 </header>
 <div class="layout">
 <nav class="tabs">
-  <button class="tab active" id="tab-board" onclick="switchTab('board')">📋 调度看板</button>
-  <button class="tab" id="tab-drivers" onclick="switchTab('drivers')">🚛 司机分类</button>
+  <button class="tab active" id="tab-6666600000863" onclick="switchTab('6666600000863')">云顺看板</button>
+  <button class="tab" id="tab-6666600000114" onclick="switchTab('6666600000114')">逍蜂看板</button>
+  <button class="tab" id="tab-6666600000115" onclick="switchTab('6666600000115')">原赫看板</button>
 </nav>
 <div class="content">
 <main id="page-board">
@@ -209,7 +201,7 @@
     <div class="card-head">
       <h2>调度列表</h2>
       <span class="sub" id="sub-main"></span>
-      <label class="pallet-toggle" title="勾选后显示全部司机（含司机分类页中标记「不显示」的）；默认只显示标记「显示」的司机">
+      <label class="pallet-toggle" title="勾选后显示全部司机（含标记「不显示」的）；默认只显示标记「显示」的司机">
         <input type="checkbox" id="show-pallet-chk" onchange="if(LAST)render(LAST)">显示隐藏司机
       </label>
     </div>
@@ -221,15 +213,6 @@
     <summary>执行日志</summary>
     <pre id="log-pre"></pre>
   </details>
-</main>
-<main id="page-drivers" style="display:none">
-  <section class="card">
-    <div class="card-head">
-      <h2>司机分类</h2>
-      <span class="sub" id="drv-sub">加载中…</span>
-    </div>
-    <div class="card-body" id="drv-body"><div class="empty">加载中…</div></div>
-  </section>
 </main>
 </div>
 </div>
@@ -351,24 +334,16 @@ function renderInner(data){
   };
 
   let html = '';
-  let selCf = '';   // 当前选中的劳务名称（'' = 全部供应商）
+  let selCf = CARRIER_NAME[CUR_CARRIER] || '';   // 当前承运商（左侧菜单标签页，'' = 全部）
   let groups = (t1 && t1.groups) || [];
   let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（copyStores 按 data-gi 取原始组）
-  // 【2026-10-14 用户要求】列表跟随供应商下拉框：下拉框选了某劳务（默认当涂云顺）时，
-  // 即使快照是「全部供应商」拉下来的，页面也只显示该劳务的司机任务
-  {
-    const sel = document.getElementById('carrier-sel');
-    if(sel && sel.value !== 'all'){
-      const opt = sel.options[sel.selectedIndex];
-      selCf = (opt ? opt.textContent : '').trim();
-      if(selCf){
-        const kept = [];
-        groups.forEach((g, i) => { if((g.carrier||'') && ((g.carrier||'').includes(selCf) || selCf.includes(g.carrier||''))) kept.push(i); });
-        if(kept.length){          // 【保护】全部滤光（如旧快照无 carrier 字段）时保留原列表
-          groups = kept.map(i => groups[i]);
-          gidx = kept;
-        }
-      }
+  // 【2026-10-18】列表跟随左侧承运商看板：选中某承运商时只显示该劳务的司机任务
+  if(selCf){
+    const kept = [];
+    groups.forEach((g, i) => { if((g.carrier||'') && ((g.carrier||'').includes(selCf) || selCf.includes(g.carrier||''))) kept.push(i); });
+    if(kept.length){          // 【保护】全部滤光（如旧快照无 carrier 字段）时保留原列表
+      groups = kept.map(i => groups[i]);
+      gidx = kept;
     }
   }
   // 更新后保持卡片展开/关闭状态：重建前记录现有卡片开关（按司机名；其他门店用固定键）
@@ -609,13 +584,15 @@ function fitTabs(){
 window.addEventListener('resize', fitTabs);
 window.addEventListener('load', fitTabs);
 fitTabs();
-function switchTab(pg){
-  document.getElementById('tab-board').classList.toggle('active', pg==='board');
-  document.getElementById('tab-drivers').classList.toggle('active', pg==='drivers');
-  document.getElementById('page-board').style.display = pg==='board' ? '' : 'none';
-  document.getElementById('page-drivers').style.display = pg==='drivers' ? '' : 'none';
-  if(pg==='drivers') loadDrivers();
-  if(pg==='board' && LAST) fetchDriversMap().then(()=>render(LAST));
+// 【2026-10-18】左侧菜单 = 承运商看板（司机分类页已删除）
+let CUR_CARRIER = '6666600000863';   // 默认云顺
+const CARRIER_NAME = {'6666600000863':'云顺','6666600000114':'逍蜂','6666600000115':'原赫'};
+function switchTab(cid){
+  CUR_CARRIER = cid;
+  for(const k of Object.keys(CARRIER_NAME)){
+    document.getElementById('tab-'+k).classList.toggle('active', k===cid);
+  }
+  if(LAST) fetchDriversMap().then(()=>render(LAST));
 }
 async function loadDrivers(){
   const base = STATIC_MODE ? await ensureTunnel() : '';
@@ -734,12 +711,6 @@ function copyDepartText(btn){
   copyText(document.getElementById('depart-text').value, btn, '复制');
 }
 
-// 【2026-10-18】供应商下拉框：直接用本地快照即时过滤重渲染（不再重新拉数）
-function onCarrierChange(){
-  if(LAST){ render(LAST); }
-  else { runTask('1'); }   // 尚无数据时才触发拉取
-}
-
 async function runTask(tid, isRetry){
   if(running) return;
   // 【2026-10-18 修复】任务1永远拉全部供应商：之前按下拉框供应商拉数会把快照覆盖成
@@ -752,8 +723,6 @@ async function runTask(tid, isRetry){
   }
   running = true;
   document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
-  const sel = document.getElementById('carrier-sel');
-  if(sel) sel.disabled = true;
   const btn = document.getElementById('btn-'+tid);
   const LBL = {'1':'☰','2':'⇩','3':'▦','all':'⟳','full':'⚡'};   // 图标按钮：更新完成后恢复图标
   const old = LBL[tid] || '📋';
@@ -761,7 +730,7 @@ async function runTask(tid, isRetry){
   try{
     let url = base + '/api/run?task='+tid;
     if(tid==='1' || tid==='all' || tid==='full'){
-      url += '&carrier=all';   // 快照始终全量，页面按下拉框前端过滤
+      url += '&carrier=all';   // 快照始终全量，页面按左侧承运商标签前端过滤
     }
     // 超时保护：请求卡死时自动中断，避免 running 卡住导致按钮永久失效
     // （全部更新要连跑 3 个任务，给更长的等待时间）
@@ -806,8 +775,6 @@ async function runTask(tid, isRetry){
   }finally{
     running = false;
     document.querySelectorAll('.btn').forEach(b=>b.disabled=false);
-    const s = document.getElementById('carrier-sel');
-    if(s) s.disabled = false;
   }
 }
 
