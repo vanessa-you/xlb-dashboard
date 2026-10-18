@@ -1,1 +1,1 @@
-window.XLB_TUNNEL_URL = "https://souls-extraordinary-relationship-convenient.trycloudflare.com";
+window.XLB_TUNNEL_URL = "https://xlb.hepinggh.cn";
