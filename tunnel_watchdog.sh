@@ -1,10 +1,10 @@
 #!/bin/bash
 # 隧道看门狗（单次检查版，由 cron 每分钟调用）
 # 1) 看护本机看板服务(8787)：无响应则拉起
-# 2) 看护 cloudflared 隧道：连续 3 次外网探测失败 → 重启隧道 → 新地址自动推送 Pages
-#    （【2026-10-15】阈值 5→3，探测已改为校验 HTTP 200，假阳性风险低；端点被回收时立即重启）
-#    多重探测（系统代理 + 公共DNS直连）避免本机 DNS 负缓存造成误判
-#    重启后 5 分钟冷却，避免"新隧道边缘未就绪"被反复重启
+# 2) 看护【命名隧道】xlb.hepinggh.cn（2026-10-19 起，固定地址不再换址）：
+#    连续 3 次探测失败 → 重启命名隧道（地址不变，无需推送 Pages）
+#    （旧快速隧道 trycloudflare.com 已废弃：免费临时地址 18分钟~4小时就被回收，
+#     导致看板频繁「更新失败」；命名隧道基于用户域名 hepinggh.cn 永久有效）
 # 日志 /tmp/xlb_watchdog.log；失败计数 /tmp/xlb_watchdog.fail；冷却时间戳 /tmp/xlb_watchdog.restart
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CF="$DIR/cloudflared"
@@ -15,6 +15,8 @@ RESTARTFILE=/tmp/xlb_watchdog.restart
 TUNLOG=/tmp/xlb_tunnel.log
 MAXFAIL=3
 COOLDOWN=300
+TUNURL="https://xlb.hepinggh.cn"          # 固定隧道入口
+TUNNAME="xlb-dashboard"                    # 命名隧道名（凭证 ~/.cloudflared/）
 PY=/Users/youww/.workbuddy/binaries/python/versions/3.13.12/bin/python3
 [ -x "$PY" ] || PY=$(command -v python3)
 [ -x "$CF" ] || { echo "$(date '+%F %T') 找不到 cloudflared 二进制" >> "$LOG"; exit 1; }
@@ -53,9 +55,7 @@ tunnel_url() {
     | grep -vE 'https://(api|update|region[0-9]*)\.trycloudflare\.com' | tail -1
 }
 
-# 探测隧道是否可达：策略1 经系统代理；策略2 公共DNS解析后直连
-# 【2026-10-15 修复】必须校验 HTTP 状态码：Cloudflare 隧道掉线时会返回 530/1033 错误页，
-# 而 curl 对 530 的退出码仍是 0 —— 旧版只看退出码 → 误判"隧道正常"，永远不重启。
+# 【2026-10-19 起命名隧道】固定地址 xlb.hepinggh.cn，无需再从日志提取/推送 Pages
 probe() {
   local u="$1" ip code
   [ -z "$u" ] && return 1
@@ -72,12 +72,12 @@ probe() {
 }
 
 # ---- 2) 隧道探测 ----
-# 重启冷却期内不重复重启（新隧道域名在边缘生效需 30s~数分钟）
+# 重启冷却期内不重复重启（连接边缘需数十秒）
 if [ -f "$RESTARTFILE" ] && [ "$(($(date +%s) - $(cat "$RESTARTFILE" 2>/dev/null || echo 0)))" -lt "$COOLDOWN" ]; then
   exit 0
 fi
 
-URL=$(tunnel_url)
+URL="$TUNURL"
 if probe "$URL"; then
   rm -f "$FAILFILE"   # 探测成功，清零失败计数
   # 每小时整点写一条心跳，便于确认 cron 仍在工作
@@ -86,36 +86,25 @@ if probe "$URL"; then
 fi
 
 FAIL=$(( $(cat "$FAILFILE" 2>/dev/null || echo 0) + 1 ))
-# 【2026-10-15】快速通道：快速隧道端点被 Cloudflare 回收时，日志会出现
-# "Unauthorized: Tunnel not found"。此时隧道不可能自愈（域名已失效），
-# 没必要等满阈值 → 计数直接拉满，立即重启换新地址（缩短不可用窗口）。
-if tail -n 80 "$TUNLOG" 2>/dev/null | grep -qiE "tunnel not found|unauthorized"; then
-  echo "$(date '+%F %T') 隧道端点已被回收（Tunnel not found），立即重启（不等阈值）" >> "$LOG"
-  FAIL=$MAXFAIL
-fi
 echo "$FAIL" > "$FAILFILE"
 echo "$(date '+%F %T') 隧道检查失败 $FAIL/$MAXFAIL (URL=$URL)" >> "$LOG"
 [ "$FAIL" -lt "$MAXFAIL" ] && exit 0
 
-# ---- 连续失败：重启隧道 ----
+# ---- 连续失败：重启命名隧道（地址固定，无需推送 Pages）----
 rm -f "$FAILFILE"
 date +%s > "$RESTARTFILE"
-echo "$(date '+%F %T') 连续失败，重启隧道…" >> "$LOG"
+echo "$(date '+%F %T') 连续失败，重启命名隧道 $TUNNAME…" >> "$LOG"
 pkill -x cloudflared 2>/dev/null
 sleep 2
 rm -f "$TUNLOG"
-nohup "$CF" tunnel --protocol http2 --url http://localhost:8787 --no-autoupdate > "$TUNLOG" 2>&1 &
+nohup "$CF" tunnel --config "$HOME/.cloudflared/config.yml" run "$TUNNAME" >> "$TUNLOG" 2>&1 &
 NEW=""
 for i in $(seq 1 30); do
   sleep 2
-  NEW=$(tunnel_url)
-  if [ -n "$NEW" ] && probe "$NEW"; then break; fi
-  NEW=""
+  if probe "$URL"; then NEW=1; break; fi
 done
 if [ -n "$NEW" ]; then
-  echo "$(date '+%F %T') 新隧道地址: $NEW → 推送 Pages" >> "$LOG"
-  export XLB_GH_TOKEN=$(cat "$HOME/.xlb_gh_token" 2>/dev/null)
-  bash "$DIR/update_tunnel.sh" "$NEW" >> "$LOG" 2>&1 && echo "$(date '+%F %T') Pages 入口已更新" >> "$LOG"
+  echo "$(date '+%F %T') 命名隧道已恢复 ($URL，地址固定)" >> "$LOG"
 else
-  echo "$(date '+%F %T') 隧道重启后暂未可达（边缘生效中），下轮冷却结束后再试" >> "$LOG"
+  echo "$(date '+%F %T') 隧道重启后暂未可达，下轮冷却结束后再试" >> "$LOG"
 fi
