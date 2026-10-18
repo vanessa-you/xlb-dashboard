@@ -746,7 +746,6 @@ async function runTask(tid, isRetry){
     pre.textContent = (j.ok?'✅ 执行完成\n':'❌ 执行失败\n') + (j.log||'');
     box.style.display = 'block';
     if(btn) btn.innerHTML = old;
-    if(document.getElementById('tab-drivers').classList.contains('active')) loadDrivers();
   }catch(e){
     // 静态镜像下失败的两类原因，都要自动重试：
     //  ① 隧道地址已过期（隧道重启后地址变了）→ 重取 tunnel_url.js，换址立即重试
