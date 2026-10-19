@@ -339,9 +339,10 @@ function renderInner(data){
   let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（copyStores 按 data-gi 取原始组）
   // 【2026-10-18】列表跟随左侧承运商看板：选中某承运商时只显示该劳务的司机任务
   if(selCf){
-    const kept = [];
-    groups.forEach((g, i) => { if((g.carrier||'') && ((g.carrier||'').includes(selCf) || selCf.includes(g.carrier||''))) kept.push(i); });
-    if(kept.length){          // 【保护】全部滤光（如旧快照无 carrier 字段）时保留原列表
+    // 只有旧格式快照（整份都没有 carrier 字段）才跳过过滤；新格式严格过滤，筛完为 0 组就显示空提示（2026-10-20 修复：云顺 0 单时误显示全部）
+    if(groups.some(g => (g.carrier || '').trim())){
+      const kept = [];
+      groups.forEach((g, i) => { const c = g.carrier || ''; if(c && (c.includes(selCf) || selCf.includes(c))) kept.push(i); });
       groups = kept.map(i => groups[i]);
       gidx = kept;
     }
@@ -431,7 +432,7 @@ function renderInner(data){
       <table><colgroup><col class="w-store"><col class="w-wait"><col class="w-chan"><col></colgroup><tr><th>门店</th><th class="c">待拣/条</th><th>通道</th><th>托盘状态</th></tr>${rows}</table>
     </details>`;
   }
-  body.innerHTML = html || '<div class="empty">暂无门店数据</div>';
+  body.innerHTML = html || `<div class="empty">${selCf ? esc(selCf) + ' 今日暂无已调度运单' : '暂无门店数据'}</div>`;
 
   let sub = [];
   if(t1){
