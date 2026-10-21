@@ -75,9 +75,6 @@
   .rush-btn { margin-left:10px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#ff7d00; color:#fff; cursor:pointer; vertical-align:1px; }
   .rush-btn:hover { background:#ff9a2e; }
   .rush-btn:disabled { background:#c9cdd4; cursor:default; }
-  .copy-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#165dff; color:#fff; cursor:pointer; vertical-align:1px; }
-  .copy-btn:hover { background:#4080ff; }
-  .copy-btn.ok { background:#00b578; }
   .depart-btn { margin-left:6px; padding:1px 8px; font-size:11px; border:none; border-radius:9px; background:#00b578; color:#fff; cursor:pointer; vertical-align:1px; }
   .depart-btn:hover { background:#23c082; }
   .depart-btn:disabled { background:#c9cdd4; cursor:default; }
@@ -148,8 +145,8 @@
     .driver-cell { order:1; flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; row-gap:4px; }
     .drv-contact { margin-left:0; }
     .g-cnt { order:2; flex:none; }
-    .copy-btn, .route-btn, .depart-btn { order:3; margin-left:0; flex:1 1 0; text-align:center; padding:7px 0; font-size:12px; }
-    .copy-btn { order:3; } .route-btn { order:4; } .depart-btn { order:5; }
+    .route-btn, .depart-btn { order:3; margin-left:0; flex:1 1 0; text-align:center; padding:7px 0; font-size:12px; }
+    .route-btn { order:4; } .depart-btn { order:5; }
     .load-progress { order:6; width:100%; text-align:center; margin-left:0; padding:6px 0; font-size:12.5px; }
     .g-none { order:7; width:100%; text-align:right; }
     .carrier-edit { width:72px; }
@@ -336,7 +333,7 @@ function renderInner(data){
   let html = '';
   let selCf = CARRIER_NAME[CUR_CARRIER] || '';   // 当前承运商（左侧菜单标签页，'' = 全部）
   let groups = (t1 && t1.groups) || [];
-  let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（copyStores 按 data-gi 取原始组）
+  let gidx = groups.map((_, i) => i);   // 过滤后元素对应的原始下标（预留）
   // 【2026-10-18】列表跟随左侧承运商看板：选中某承运商时只显示该劳务的司机任务
   if(selCf){
     // 只有旧格式快照（整份都没有 carrier 字段）才跳过过滤；新格式严格过滤，筛完为 0 组就显示空提示（2026-10-20 修复：云顺 0 单时误显示全部）
@@ -358,7 +355,7 @@ function renderInner(data){
   const willShow = groups.filter(g => { const d = DRIVERS[g.driver]; return showPallet || !d || !!d.scattered || knownN === 0; }).length;
   const filterDrv = willShow > 0 || groups.length === 0;
   groups.forEach((g, k) => {
-    const gi = gidx[k];   // 原始下标：copyStores/按钮按它取未过滤的组数据
+    const gi = gidx[k];   // 原始下标（预留）
     const d = DRIVERS[g.driver];
     const isScattered = d ? !!d.scattered : (knownN === 0);  // 司机名单未加载到时兜底全显示
     if(filterDrv && !showPallet && !isScattered) return;
@@ -397,7 +394,6 @@ function renderInner(data){
       <span class="arrow">▶</span>
       <span class="driver-cell"><b class="${loadingN?'loading':''}"${loadingN?` title="该司机当前有 ${loadingN} 托装车中"`:''}>${esc(g.driver)||'(未知司机)'}</b>${contactHtml}<span class="carrier-edit" title="劳务名称">${esc(carrierOf(g))}</span></span>
       <span class="g-cnt">${g.stores.length} 店</span>
-      <button class="copy-btn" data-gi="${gi}" onclick="copyStores(this);event.preventDefault();event.stopPropagation();" title="复制该司机名下门店列表，用于发送给司机">复制门店</button>
       <button class="route-btn" data-driver="${esc(g.driver)}" onclick="storeRoute(this);event.preventDefault();event.stopPropagation();" title="按从马鞍山顺丰丰泰产业园出发的货车最优路线排序该司机名下门店">门店排序</button>
       <button class="depart-btn" data-driver="${esc(g.driver)}" onclick="departInfo(this);event.preventDefault();event.stopPropagation();" title="查询该司机当天运输中订单，生成发车信息">发车信息</button>
       ${loadProg}
@@ -533,13 +529,6 @@ async function rushStore(btn){
 
 // 复制单个门店名称（门店旁小按钮）
 // 复制司机名下门店列表：优先 clipboard API，局域网 http 环境降级 execCommand
-function copyStores(btn){
-  const gi = +btn.dataset.gi;
-  const g = LAST && LAST['1'] && LAST['1'].groups && LAST['1'].groups[gi];
-  if(!g || !g.stores || !g.stores.length){ alert('未找到该司机名下门店数据'); return; }
-  const text = g.stores.join('\n\n');
-  copyText(text, btn, '复制门店');
-}
 function copyText(text, btn, oldLabel){
   const done = () => {
     btn.textContent = '已复制✓'; btn.classList.add('ok'); btn.disabled = true;
