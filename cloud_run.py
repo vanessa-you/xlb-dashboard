@@ -77,37 +77,61 @@ def probe_at_retry(at, attempts=3, delay=4):
 
 def password_login(acc, company_id, pwd):
     """纯 API 密码登录，返回 dict(access_token, jwt, refresh_token, token_type, user)
-    2026-10-13：登录接口从海外 runner 访问国内服务偶发超时（urlopen timed out），
-    故单次调用超时放宽到 45s；上层再做整体重试"""
-    ja = _post('/erp-mdm/hxl.erp.account.pwd.user.find',
-               {'account': acc, 'company_id': company_id, 'pwd': pwd}, timeout=45)
+    2026-11-06 新链路（逆向 login-web SSO 实测）：gdp 的 erp-mdm 密码登录已下线（405）。
+      A. POST {SSO}/idaas/oauth2/token  (form-urlencoded)
+           username/password/grant_type=password/company_id/check_account/auth_source=password
+           client_id=erp/client_secret/login_source=WEB/user_id=0   + header xlb_device_mac
+         → data.access_token(JWT) data.refresh_token
+      B. POST {SSO}/user-portal/idaas.erp.user.profile  (JSON)
+           header Authorization: {token_type} {JWT}
+         → data.access_token(32位业务AT)
+    单次调用超时 45s（海外 runner 访问国内服务偶发超时），上层再做整体重试"""
+    import uuid
+    sso = os.environ.get('XLB_SSO', 'https://login-web.idaas.ali-prod.xlbsoft.com')
+    client_secret = os.environ.get('XLB_CLIENT_SECRET', '31869922-f120-2d61-e2fb-b5f5f668928f')
+    mac = uuid.uuid4().hex
+    body = urllib.parse.urlencode({
+        'username': acc, 'password': pwd, 'grant_type': 'password',
+        'company_id': str(company_id), 'check_account': acc,
+        'auth_source': 'password', 'client_id': 'erp',
+        'client_secret': client_secret, 'login_source': 'WEB', 'user_id': 0,
+    }).encode()
+    req = urllib.request.Request(sso + '/idaas/oauth2/token', data=body, method='POST')
+    req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+    req.add_header('xlb_device_mac', mac)
+    req.add_header('User-Agent', UA)
+    try:
+        with OPENER.open(req, timeout=45) as r:
+            ja = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            ja = json.loads(e.read())
+        except Exception:
+            ja = {'code': e.code, 'msg': f'HTTP {e.code}'}
+    except Exception as e:
+        raise RuntimeError(f'idaas 登录请求失败: {e}')
     if ja.get('code') != 0:
         raise RuntimeError(f'密码校验失败: code={ja.get("code")} msg={ja.get("msg")}')
     d = ja.get('data') or {}
-    lt = d.get('login_token')
-    ulist = d.get('account_user_list') or []
-    uid = (ulist[0] or {}).get('id') if ulist else None
-    if not lt:
-        raise RuntimeError('未返回 login_token')
-    _log(f'A. 密码校验通过 login_token={lt[:18]}… 用户={((ulist[0] or {}).get("name") if ulist else "?")}')
+    jwt = d.get('access_token')
+    tt = d.get('token_type') or 'Bearer'
+    rt = d.get('refresh_token') or ''
+    if not jwt:
+        raise RuntimeError('未返回 idaas token')
+    _log(f'A. idaas 密码登录通过 JWT={len(jwt)}字符 RT={(rt or "")[:16]}…')
 
-    jb = _post('/erp-mdm/hxl.erp.user.account.login',
-               {'account': acc, 'company_id': company_id, 'source': 'WEB',
-                'user_id': uid, 'login_source': 'WEB'},
-               {'Access-token': lt}, timeout=45)
+    # B. JWT 换 ERP 32位 AT
+    jb = _post(sso + '/user-portal/idaas.erp.user.profile', {},
+               {'Authorization': f'{tt} {jwt}', 'xlb_device_mac': mac}, timeout=45)
     if jb.get('code') != 0:
         raise RuntimeError(f'换取凭据失败: code={jb.get("code")} msg={jb.get("msg")}')
     ud = jb.get('data') or {}
     at = ud.get('access_token')
     if not at:
         raise RuntimeError('未返回 32 位 access_token')
-    oa = ud.get('oauth2') or {}
-    _log(f'B. 换取凭据成功 AT={at}')
-    return {'access_token': at,
-            'jwt': oa.get('access_token') or '',
-            'refresh_token': oa.get('refresh_token') or ud.get('refresh_token') or '',
-            'token_type': oa.get('token_type') or 'Bearer',
-            'user': ud, 'user_id': uid, 'company_id': company_id, 'account': acc}
+    _log(f'B. 换取凭据成功 AT={at} 用户={ud.get("name")}')
+    return {'access_token': at, 'jwt': jwt, 'refresh_token': rt, 'token_type': tt,
+            'user': ud, 'user_id': ud.get('id'), 'company_id': company_id, 'account': acc}
 
 
 def write_auth(res):
