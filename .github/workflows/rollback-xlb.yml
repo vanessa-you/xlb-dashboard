@@ -1,23 +1,24 @@
-name: rollback-xlb
+name: xlb-server-ops
 on:
   workflow_dispatch: {}
 permissions: {}
 jobs:
-  rollback:
+  ops:
     runs-on: ubuntu-latest
     steps:
-      - name: Rollback xlb index.html to previous bundle
+      - uses: actions/checkout@v4
+      - name: Deploy dist to server
         env:
           PASS: ${{ secrets.XLB_SERVER_PASS }}
         run: |
           set -e
-          sudo apt-get install -y -qq sshpass >/dev/null 2>&1 || sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
-          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@47.96.157.244 '
-            set -e
-            ls -l /var/www/xlb-dashboard/assets/index-CejaGfPZ.js
-            cp -n /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/index.html.dite.bak
-            sed -i s/index-Dite4078.js/index-CejaGfPZ.js/ /var/www/xlb-dashboard/index.html
-            echo ---HTML-REF---
-            grep -o "assets/index-[^\"]*" /var/www/xlb-dashboard/index.html
-          '
-          echo ROLLBACK_STEP_DONE
+          sudo apt-get install -y -qq sshpass >/dev/null 2>&1
+          SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=20"
+          sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index.html root@47.96.157.244:/var/www/xlb-dashboard/index.html
+          sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index-*.js .deploy-dist/index-*.css root@47.96.157.244:/var/www/xlb-dashboard/assets/
+          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-CF96bzUM.js /var/www/xlb-dashboard/assets/index-CPcnplQJ.css; echo DEPLOY_DONE'
+      - name: Cleanup deploy artifacts
+        run: |
+          git config user.email ops@xlb.local && git config user.name xlb-ops
+          git rm -rq .deploy-dist && git commit -qm "chore: cleanup deploy artifacts" && git push -q
+          echo CLEANUP_DONE
