@@ -1,0 +1,23 @@
+name: rollback-xlb
+on:
+  workflow_dispatch: {}
+permissions: {}
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rollback xlb index.html to previous bundle
+        env:
+          PASS: ${{ secrets.XLB_SERVER_PASS }}
+        run: |
+          set -e
+          sudo apt-get install -y -qq sshpass >/dev/null 2>&1 || sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+          sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 root@47.96.157.244 '
+            set -e
+            ls -l /var/www/xlb-dashboard/assets/index-CejaGfPZ.js
+            cp -n /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/index.html.dite.bak
+            sed -i s/index-Dite4078.js/index-CejaGfPZ.js/ /var/www/xlb-dashboard/index.html
+            echo ---HTML-REF---
+            grep -o "assets/index-[^\"]*" /var/www/xlb-dashboard/index.html
+          '
+          echo ROLLBACK_STEP_DONE
