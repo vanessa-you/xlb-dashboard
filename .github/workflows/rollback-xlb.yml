@@ -1,7 +1,8 @@
 name: xlb-server-ops
 on:
   workflow_dispatch: {}
-permissions: {}
+permissions:
+  contents: write
 jobs:
   ops:
     runs-on: ubuntu-latest
