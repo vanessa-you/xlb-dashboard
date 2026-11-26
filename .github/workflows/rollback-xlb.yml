@@ -17,7 +17,7 @@ jobs:
           SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=20"
           sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index.html root@47.96.157.244:/var/www/xlb-dashboard/index.html
           sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index-*.js .deploy-dist/index-*.css root@47.96.157.244:/var/www/xlb-dashboard/assets/
-          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-BjzcFjPG.js /var/www/xlb-dashboard/assets/index-C3Wmec1z.css; echo DEPLOY_DONE'
+          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-Dad8xne3.js /var/www/xlb-dashboard/assets/index-DogK3zSQ.css; echo DEPLOY_DONE'
       - name: Cleanup deploy artifacts
         run: |
           git config user.email ops@xlb.local && git config user.name xlb-ops
