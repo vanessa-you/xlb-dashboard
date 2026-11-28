@@ -16,9 +16,15 @@ jobs:
           sudo apt-get install -y -qq sshpass >/dev/null 2>&1
           SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=20"
           sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index.html root@47.96.157.244:/var/www/xlb-dashboard/index.html
-          sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index-*.js .deploy-dist/index-*.css root@47.96.157.244:/var/www/xlb-dashboard/assets/
-          if [ -f .deploy-dist/route-board.html ]; then sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/route-board.html root@47.96.157.244:/var/www/xlb-dashboard/route-board.html; fi
-          if [ -f .deploy-dist/store-data.json ]; then sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/store-data.json root@47.96.157.244:/var/www/xlb-dashboard/store-data.json; fi
+          for f in .deploy-dist/index-*.js .deploy-dist/index-*.css .deploy-dist/route-board.html .deploy-dist/store-data.json; do
+            if [ -e "$f" ]; then
+              case "$f" in
+                */index-*.js|*/index-*.css) DEST=/var/www/xlb-dashboard/assets/ ;;
+                *) DEST=/var/www/xlb-dashboard/ ;;
+              esac
+              sshpass -p "$PASS" scp $SSHOPTS "$f" root@47.96.157.244:$DEST
+            fi
+          done
           sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-iOB3K3r3.js; echo DEPLOY_DONE'
       - name: Cleanup deploy artifacts
         run: |
