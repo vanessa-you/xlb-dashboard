@@ -25,7 +25,7 @@ jobs:
               sshpass -p "$PASS" scp $SSHOPTS "$f" root@47.96.157.244:$DEST
             fi
           done
-          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-iOB3K3r3.js; echo DEPLOY_DONE'
+          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-B6qZyLQU.js; echo DEPLOY_DONE'
       - name: Cleanup deploy artifacts
         run: |
           git config user.email ops@xlb.local && git config user.name xlb-ops
