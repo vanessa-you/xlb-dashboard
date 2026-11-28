@@ -17,7 +17,9 @@ jobs:
           SSHOPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=20"
           sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index.html root@47.96.157.244:/var/www/xlb-dashboard/index.html
           sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/index-*.js .deploy-dist/index-*.css root@47.96.157.244:/var/www/xlb-dashboard/assets/
-          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-CVRnUp7t.js /var/www/xlb-dashboard/assets/index-DUTWhvfX.css; echo DEPLOY_DONE'
+          if [ -f .deploy-dist/route-board.html ]; then sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/route-board.html root@47.96.157.244:/var/www/xlb-dashboard/route-board.html; fi
+          if [ -f .deploy-dist/store-data.json ]; then sshpass -p "$PASS" scp $SSHOPTS .deploy-dist/store-data.json root@47.96.157.244:/var/www/xlb-dashboard/store-data.json; fi
+          sshpass -p "$PASS" ssh $SSHOPTS root@47.96.157.244 'md5sum /var/www/xlb-dashboard/index.html /var/www/xlb-dashboard/assets/index-DrDpNYWx.js /var/www/xlb-dashboard/assets/index-B5Y28LVV.css /var/www/xlb-dashboard/route-board.html /var/www/xlb-dashboard/store-data.json; echo DEPLOY_DONE'
       - name: Cleanup deploy artifacts
         run: |
           git config user.email ops@xlb.local && git config user.name xlb-ops
